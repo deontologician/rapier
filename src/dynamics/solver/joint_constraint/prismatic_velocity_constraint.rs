@@ -238,7 +238,7 @@ impl PrismaticVelocityConstraint {
 
         // Setup limit constraint.
         let mut limits_active = false;
-        let limits_forcedir2 = axis2.into_inner(); // hopefully axis1 is colinear with axis2
+        let limits_forcedir2 = axis2.into_inner(); // hopefully axis1 is collinear with axis2
         let mut limits_rhs = 0.0;
         let mut limits_impulse = 0.0;
         let mut limits_inv_lhs = 0.0;

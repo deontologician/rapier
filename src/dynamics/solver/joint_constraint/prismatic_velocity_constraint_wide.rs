@@ -243,7 +243,7 @@ impl WPrismaticVelocityConstraint {
 
         // Setup limit constraint.
         let zero: SimdReal = na::zero();
-        let limits_forcedir2 = axis2; // hopefully axis1 is colinear with axis2
+        let limits_forcedir2 = axis2; // hopefully axis1 is collinear with axis2
         let mut limits_active = false;
         let mut limits_rhs = zero;
         let mut limits_impulse = zero;
@@ -693,7 +693,7 @@ impl WPrismaticVelocityGroundConstraint {
 
         // Setup limit constraint.
         let zero: SimdReal = na::zero();
-        let limits_forcedir2 = axis2; // hopefully axis1 is colinear with axis2
+        let limits_forcedir2 = axis2; // hopefully axis1 is collinear with axis2
         let mut limits_active = false;
         let mut limits_rhs = zero;
         let mut limits_impulse = zero;

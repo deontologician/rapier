@@ -1,5 +1,6 @@
 //! Structures related to dynamics: bodies, joints, etc.
 
+pub use self::articulation::*;
 pub use self::ccd::CCDSolver;
 pub use self::coefficient_combine_rule::CoefficientCombineRule;
 pub use self::integration_parameters::IntegrationParameters;
@@ -37,6 +38,11 @@ mod island_manager;
 mod joint;
 mod rigid_body_components;
 mod solver;
+
+mod articulation;
+// mod multibody;
+// mod multibody_link;
+// mod multibody_workspace;
 
 #[cfg(feature = "default-sets")]
 mod rigid_body;

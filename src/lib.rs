@@ -140,16 +140,48 @@ pub mod utils;
 /// Elementary mathematical entities (vectors, matrices, isometries, etc).
 pub mod math {
     pub use parry::math::*;
+
+    /*
+     * 2D
+     */
     /// Max number of pairs of contact points from the same
     /// contact manifold that can be solved as part of a
     /// single contact constraint.
     #[cfg(feature = "dim2")]
     pub const MAX_MANIFOLD_POINTS: usize = 2;
+
+    /// The type of a slice of the constraint jacobian in twist coordinates.
+    #[cfg(feature = "dim2")]
+    pub type JacobianSlice<'a, N> = na::MatrixSlice3xX<'a, N>;
+
+    /// The type of a mutable slice of the constraint jacobian in twist coordinates.
+    #[cfg(feature = "dim2")]
+    pub type JacobianSliceMut<'a, N> = na::MatrixSliceMut3xX<'a, N>;
+
+    /// The maximum number of possible rotations and translations of a rigid body.
+    #[cfg(feature = "dim2")]
+    pub const SPATIAL_DIM: usize = 3;
+
+    /*
+     * 3D
+     */
     /// Max number of pairs of contact points from the same
     /// contact manifold that can be solved as part of a
     /// single contact constraint.
     #[cfg(feature = "dim3")]
     pub const MAX_MANIFOLD_POINTS: usize = 4;
+
+    /// The type of a slice of the constraint jacobian in twist coordinates.
+    #[cfg(feature = "dim3")]
+    pub type JacobianSlice<'a, N> = na::MatrixSlice6xX<'a, N>;
+
+    /// The type of a mutable slice of the constraint jacobian in twist coordinates.
+    #[cfg(feature = "dim3")]
+    pub type JacobianSliceMut<'a, N> = na::MatrixSliceMut6xX<'a, N>;
+
+    /// The maximum number of possible rotations and translations of a rigid body.
+    #[cfg(feature = "dim3")]
+    pub const SPATIAL_DIM: usize = 6;
 }
 
 /// Prelude containing the common types defined by Rapier.
