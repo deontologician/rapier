@@ -1,7 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::articulation::Articulation;
-use crate::math::{Inertia, Isometry, Point, Real, Vector, Velocity};
+use crate::dynamics::{Articulation, RigidBodyHandle};
+use crate::math::{AngularInertia, Isometry, Point, Real, Vector};
+use crate::prelude::RigidBodyVelocity;
 
 /// One link of a multibody.
 pub struct MultibodyLink {
@@ -12,53 +13,47 @@ pub struct MultibodyLink {
     pub(crate) impulse_id: usize,
     pub(crate) is_leaf: bool,
 
-    // XXX: rename to "joint".
-    // (And rename the full-coordinates joint constraints ArticulationConstraint).
+    // XXX: rename to "articulation".
+    // (And rename the full-coordinates articulation constraints ArticulationConstraint).
     pub(crate) parent_internal_id: usize,
-    pub(crate) dof: Box<dyn Articulation>,
-    pub(crate) parent_shift: Vector<N>,
-    pub(crate) body_shift: Vector<N>,
+    pub(crate) articulation: Box<dyn Articulation>,
+    pub(crate) parent_shift: Vector<Real>,
+    pub(crate) body_shift: Vector<Real>,
 
     // Change at each time step.
-    pub(crate) parent_to_world: Isometry<N>,
-    pub(crate) local_to_world: Isometry<N>,
-    pub(crate) local_to_parent: Isometry<N>,
+    pub(crate) parent_to_world: Isometry<Real>,
+    // TODO: should this be removed in favor of the rigid-body position?
+    pub(crate) local_to_world: Isometry<Real>,
+    pub(crate) local_to_parent: Isometry<Real>,
     // FIXME: put this on a workspace buffer instead ?
-    pub(crate) velocity_dot_wrt_joint: Velocity<N>,
+    pub(crate) velocity_dot_wrt_joint: RigidBodyVelocity,
     // J' q' in world space. FIXME: what could be a better name ?
-    pub(crate) velocity_wrt_joint: Velocity<N>,
-    // J  q' in world space.
-    pub(crate) velocity: Velocity<N>,
-    pub(crate) inertia: Inertia<N>,
-    pub(crate) com: Point<N>,
-
-    pub(crate) local_inertia: Inertia<N>,
-    pub(crate) local_com: Point<N>,
-    // TODO: User-defined data
-    // user_data:       T
+    pub(crate) velocity_wrt_joint: RigidBodyVelocity,
+    // J  q' in world space is the rigid-body velocity.
+    pub(crate) rigid_body: RigidBodyHandle,
 }
 
 impl MultibodyLink {
+    /*
     /// Creates a new multibody link.
     pub fn new(
         internal_id: usize,
         assembly_id: usize,
         impulse_id: usize,
         parent_internal_id: usize,
-        dof: Box<dyn Articulation>,
+        articulation: Box<dyn Articulation>,
         parent_shift: Vector<Real>,
         body_shift: Vector<Real>,
         parent_to_world: Isometry<Real>,
         local_to_world: Isometry<Real>,
         local_to_parent: Isometry<Real>,
-        local_inertia: Inertia<Real>,
+        local_inertia: AngularInertia<Real>,
         local_com: Point<Real>,
     ) -> Self {
         let is_leaf = true;
-        let velocity = Velocity::zero();
-        let velocity_dot_wrt_joint = Velocity::zero();
-        let velocity_wrt_joint = Velocity::zero();
-        let inertia = local_inertia.transformed(&local_to_world);
+        let velocity_dot_wrt_joint = RigidBodyVelocity::zero();
+        let velocity_wrt_joint = RigidBodyVelocity::zero();
+        let inertia = local_inertia; // XXX: .transformed(&local_to_world);
         let com = local_to_world * local_com;
 
         MultibodyLink {
@@ -68,7 +63,7 @@ impl MultibodyLink {
             impulse_id,
             is_leaf,
             parent_internal_id,
-            dof,
+            articulation,
             parent_shift,
             body_shift,
             parent_to_world,
@@ -83,6 +78,7 @@ impl MultibodyLink {
             com,
         }
     }
+    */
 
     /// Checks if this link is the root of the multibody.
     #[inline]
@@ -90,27 +86,27 @@ impl MultibodyLink {
         self.internal_id == 0
     }
 
-    /// Reference to the joint attaching this link to its parent.
+    /// Reference to the articulation attaching this link to its parent.
     #[inline]
-    pub fn joint(&self) -> &dyn Articulation<N> {
-        &*self.dof
+    pub fn articulation(&self) -> &dyn Articulation {
+        &*self.articulation
     }
 
-    /// Mutable reference to the joint attaching this link to its parent.
+    /// Mutable reference to the articulation attaching this link to its parent.
     #[inline]
-    pub fn joint_mut(&mut self) -> &mut dyn Articulation<N> {
-        &mut *self.dof
+    pub fn articulation_mut(&mut self) -> &mut dyn Articulation {
+        &mut *self.articulation
     }
 
-    /// The shift between this link's parent and this link joint origin.
+    /// The shift between this link's parent and this link articulation origin.
     #[inline]
-    pub fn parent_shift(&self) -> &Vector<N> {
+    pub fn parent_shift(&self) -> &Vector<Real> {
         &self.parent_shift
     }
 
-    /// The shift between this link's joint origin and this link origin.
+    /// The shift between this link's articulation origin and this link origin.
     #[inline]
-    pub fn body_shift(&self) -> &Vector<N> {
+    pub fn body_shift(&self) -> &Vector<Real> {
         &self.body_shift
     }
 

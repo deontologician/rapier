@@ -8,7 +8,7 @@ use crate::math::{
     AngVector, AngularInertia, Isometry, Point, Real, Rotation, Translation, Vector,
 };
 use crate::parry::partitioning::IndexedData;
-use crate::utils::{WCross, WDot};
+use crate::utils::{WAngularInertia, WCross, WDot};
 use num::Zero;
 
 /// The unique handle of a rigid body added to a `RigidBodySet`.
@@ -274,6 +274,13 @@ impl RigidBodyMassProps {
     #[must_use]
     pub fn effective_mass(&self) -> Real {
         crate::utils::inv(self.effective_inv_mass)
+    }
+
+    /// The effective world-space angular inertia (that takes the potential rotation locking into account) of
+    /// this rigid-body.
+    #[must_use]
+    pub fn effective_angular_inertia(&self) -> AngularInertia<Real> {
+        self.effective_world_inv_inertia_sqrt.squared().inverse()
     }
 
     /// Update the world-space mass properties of `self`, taking into account the new position.
@@ -613,6 +620,14 @@ impl std::ops::Add<RigidBodyVelocity> for RigidBodyVelocity {
             linvel: self.linvel + rhs.linvel,
             angvel: self.angvel + rhs.angvel,
         }
+    }
+}
+
+impl std::ops::AddAssign<RigidBodyVelocity> for RigidBodyVelocity {
+    #[must_use]
+    fn add_assign(&mut self, rhs: Self) {
+        self.linvel += rhs.linvel;
+        self.angvel += rhs.angvel;
     }
 }
 

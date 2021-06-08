@@ -150,11 +150,15 @@ pub mod math {
     #[cfg(feature = "dim2")]
     pub const MAX_MANIFOLD_POINTS: usize = 2;
 
-    /// The type of a slice of the constraint jacobian in twist coordinates.
+    /// The type of a constraint Jacobian in twist coordinates.
+    #[cfg(feature = "dim2")]
+    pub type Jacobian<N> = na::Matrix3xX<N>;
+
+    /// The type of a slice of the constraint Jacobian in twist coordinates.
     #[cfg(feature = "dim2")]
     pub type JacobianSlice<'a, N> = na::MatrixSlice3xX<'a, N>;
 
-    /// The type of a mutable slice of the constraint jacobian in twist coordinates.
+    /// The type of a mutable slice of the constraint Jacobian in twist coordinates.
     #[cfg(feature = "dim2")]
     pub type JacobianSliceMut<'a, N> = na::MatrixSliceMut3xX<'a, N>;
 
@@ -171,11 +175,15 @@ pub mod math {
     #[cfg(feature = "dim3")]
     pub const MAX_MANIFOLD_POINTS: usize = 4;
 
-    /// The type of a slice of the constraint jacobian in twist coordinates.
+    /// The type of a constraint Jacobian in twist coordinates.
+    #[cfg(feature = "dim3")]
+    pub type Jacobian<N> = na::Matrix6xX<N>;
+
+    /// The type of a slice of the constraint Jacobian in twist coordinates.
     #[cfg(feature = "dim3")]
     pub type JacobianSlice<'a, N> = na::MatrixSlice6xX<'a, N>;
 
-    /// The type of a mutable slice of the constraint jacobian in twist coordinates.
+    /// The type of a mutable slice of the constraint Jacobian in twist coordinates.
     #[cfg(feature = "dim3")]
     pub type JacobianSliceMut<'a, N> = na::MatrixSliceMut6xX<'a, N>;
 

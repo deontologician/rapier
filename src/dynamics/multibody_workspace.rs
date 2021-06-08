@@ -1,9 +1,11 @@
+use crate::dynamics::RigidBodyVelocity;
 use crate::math::Real;
+use na::DVector;
 
 /// A temporary workspace for various updates of the multibody.
 pub(crate) struct MultibodyWorkspace {
-    accs: Vec<Velocity<Real>>,
-    ndofs_vec: DVector<Real>,
+    pub accs: Vec<RigidBodyVelocity>,
+    pub ndofs_vec: DVector<Real>,
 }
 
 impl MultibodyWorkspace {
@@ -17,7 +19,7 @@ impl MultibodyWorkspace {
 
     /// Resize the workspace so it is enough for `nlinks` links.
     pub fn resize(&mut self, nlinks: usize, ndofs: usize) {
-        self.accs.resize(nlinks, Velocity::zero());
+        self.accs.resize(nlinks, RigidBodyVelocity::zero());
         self.ndofs_vec = DVector::zeros(ndofs)
     }
 }

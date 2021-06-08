@@ -40,9 +40,9 @@ mod rigid_body_components;
 mod solver;
 
 mod articulation;
-// mod multibody;
-// mod multibody_link;
-// mod multibody_workspace;
+mod multibody;
+mod multibody_link;
+mod multibody_workspace;
 
 #[cfg(feature = "default-sets")]
 mod rigid_body;
