@@ -5,6 +5,8 @@ pub use self::articulation_motor::ArticulationMotor;
 pub use self::cartesian_articulation::CartesianArticulation;
 pub use self::fixed_articulation::FixedArticulation;
 pub use self::free_articulation::FreeArticulation;
+pub use self::multibody::Multibody;
+pub use self::multibody_set::{MultibodyHandle, MultibodySet};
 pub use self::prismatic_articulation::PrismaticArticulation;
 pub use self::revolute_articulation::RevoluteArticulation;
 pub use self::unit_articulation::UnitArticulation;
@@ -27,6 +29,11 @@ pub use self::planar_articulation::PlanarArticulation;
 pub use self::rectangular_articulation::RectangularArticulation;
 #[cfg(feature = "dim3")]
 pub use self::universal_articulation::UniversalArticulation;
+
+mod multibody;
+mod multibody_link;
+mod multibody_set;
+mod multibody_workspace;
 
 mod articulation;
 mod articulation_motor;

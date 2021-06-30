@@ -105,9 +105,9 @@ impl Articulation for PinSlotArticulation {
         self.revo.default_damping(&mut out.rows_mut(1, 1));
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.prism.integrate(parameters, vels);
-        self.revo.integrate(parameters, &[vels[1]]);
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.prism.integrate(dt, vels);
+        self.revo.integrate(dt, &[vels[1]]);
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

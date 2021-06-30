@@ -8,6 +8,7 @@ use inflector::Inflector;
 use rapier_testbed3d::{Testbed, TestbedApp};
 use std::cmp::Ordering;
 
+mod articulations3;
 mod ccd3;
 mod collision_groups3;
 mod compound3;
@@ -78,6 +79,7 @@ pub fn main() {
     let mut builders: Vec<(_, fn(&mut Testbed))> = vec![
         ("Fountain", fountain3::init_world),
         ("Primitives", primitives3::init_world),
+        ("Articulations", articulations3::init_world),
         ("CCD", ccd3::init_world),
         ("Collision groups", collision_groups3::init_world),
         ("Compound", compound3::init_world),

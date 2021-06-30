@@ -123,10 +123,10 @@ impl Articulation for PlanarArticulation {
         self.revo.default_damping(&mut out.rows_mut(2, 1));
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.prism1.integrate(parameters, vels);
-        self.prism2.integrate(parameters, &[vels[1]]);
-        self.revo.integrate(parameters, &[vels[2]]);
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.prism1.integrate(dt, vels);
+        self.prism2.integrate(dt, &[vels[1]]);
+        self.revo.integrate(dt, &[vels[2]]);
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

@@ -51,8 +51,8 @@ impl Articulation for FreeArticulation {
     ) {
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        let disp = RigidBodyVelocity::from_slice(vels) * parameters.dt;
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        let disp = RigidBodyVelocity::from_slice(vels) * dt;
         self.apply_displacement(&disp);
     }
 

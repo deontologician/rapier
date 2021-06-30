@@ -52,7 +52,7 @@ impl Articulation for FixedArticulation {
     ) {
     }
 
-    fn integrate(&mut self, _: &IntegrationParameters, _: &[Real]) {}
+    fn integrate(&mut self, _: Real, _: &[Real]) {}
     fn apply_displacement(&mut self, _: &[Real]) {}
 
     fn jacobian_mul_coordinates(&self, _: &[Real]) -> RigidBodyVelocity {

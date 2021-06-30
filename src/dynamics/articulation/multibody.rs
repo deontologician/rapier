@@ -1,9 +1,9 @@
 use super::multibody_link::{MultibodyLink, MultibodyLinkVec};
 use super::multibody_workspace::MultibodyWorkspace;
-use crate::data::{BundleSet, ComponentSet, ComponentSetMut};
+use crate::data::{BundleSet, Coarena, ComponentSet, ComponentSetMut};
 use crate::dynamics::{
-    Articulation, IntegrationParameters, RigidBodyMassProps, RigidBodyPosition, RigidBodyType,
-    RigidBodyVelocity,
+    Articulation, IntegrationParameters, RigidBodyHandle, RigidBodyMassProps, RigidBodyPosition,
+    RigidBodyType, RigidBodyVelocity,
 };
 use crate::math::{
     AngDim, AngVector, AngularInertia, Dim, Isometry, Jacobian, Matrix, Point, Real, Vector, DIM,
@@ -64,16 +64,17 @@ fn concat_rb_mass_matrix(
 /// An articulated body simulated using the reduced-coordinates approach.
 pub struct Multibody {
     links: MultibodyLinkVec,
-    velocities: DVector<Real>,
-    damping: DVector<Real>,
-    accelerations: DVector<Real>,
+    pub(crate) velocities: DVector<Real>,
+    pub(crate) damping: DVector<Real>,
+    pub(crate) accelerations: DVector<Real>,
+
     impulses: DVector<Real>,
     body_jacobians: Vec<Jacobian<Real>>,
     // FIXME: use sparse matrices.
     augmented_mass: DMatrix<Real>,
     inv_augmented_mass: LU<Real, Dynamic, Dynamic>,
     ndofs: usize,
-    companion_id: usize,
+    pub(crate) solver_id: usize,
 
     /*
      * Workspaces.
@@ -92,7 +93,7 @@ pub struct Multibody {
 
 impl Multibody {
     /// Creates a new multibody with no link.
-    fn new() -> Self {
+    pub fn new() -> Self {
         Multibody {
             links: MultibodyLinkVec(Vec::new()),
             velocities: DVector::zeros(0),
@@ -103,7 +104,7 @@ impl Multibody {
             augmented_mass: DMatrix::zeros(0, 0),
             inv_augmented_mass: LU::new(DMatrix::zeros(0, 0)),
             ndofs: 0,
-            companion_id: 0,
+            solver_id: 0,
             workspace: MultibodyWorkspace::new(),
             coriolis_v: Vec::new(),
             coriolis_w: Vec::new(),
@@ -182,15 +183,13 @@ impl Multibody {
         &mut self.damping
     }
 
-    /*
-    fn add_link(
+    pub fn add_link(
         &mut self,
-        parent: Option<usize>,
+        parent: Option<usize>, // FIXME: should be a RigidBodyHandle?
         mut dof: Box<dyn Articulation>,
         parent_shift: Vector<Real>,
         body_shift: Vector<Real>,
-        local_inertia: Inertia<Real>,
-        local_com: Point<Real>,
+        body: RigidBodyHandle,
     ) -> &mut MultibodyLink {
         assert!(
             parent.is_none() || !self.links.is_empty(),
@@ -239,6 +238,7 @@ impl Multibody {
         }
 
         let rb = MultibodyLink::new(
+            body,
             internal_id,
             assembly_id,
             impulse_id,
@@ -249,8 +249,6 @@ impl Multibody {
             parent_to_world,
             local_to_world,
             local_to_parent,
-            local_inertia,
-            local_com,
         );
 
         self.links.push(rb);
@@ -269,9 +267,8 @@ impl Multibody {
         let len = self.impulses.len();
         self.impulses.resize_vertically_mut(len + nimpulses, 0.0);
     }
-     */
 
-    fn update_acceleration<Bodies>(&mut self, bodies: &Bodies)
+    pub fn update_acceleration<Bodies>(&mut self, bodies: &Bodies)
     where
         Bodies: ComponentSet<RigidBodyMassProps>
             + ComponentSet<RigidBodyForces>
@@ -329,7 +326,7 @@ impl Multibody {
             }
 
             let external_forces = Force::new(
-                rb_forces.force + rb_mass * acc.linvel,
+                rb_forces.force - rb_mass * acc.linvel,
                 rb_forces.torque - gyroscopic - rb_inertia * acc.angvel,
             );
             self.accelerations.gemv_tr(
@@ -347,7 +344,7 @@ impl Multibody {
     }
 
     /// Computes the constant terms of the dynamics.
-    fn update_dynamics<Bodies>(&mut self, dt: Real, bodies: &mut Bodies)
+    pub fn update_dynamics<Bodies>(&mut self, dt: Real, bodies: &mut Bodies)
     where
         Bodies: ComponentSetMut<RigidBodyVelocity> + ComponentSet<RigidBodyMassProps>,
     {
@@ -717,6 +714,7 @@ impl Multibody {
 
         DVectorSliceMut::from_slice(&mut self.velocities.as_mut_slice()[i..i + ndofs], ndofs)
     }
+    */
 
     #[inline]
     pub fn generalized_acceleration(&self) -> DVectorSlice<Real> {
@@ -734,17 +732,19 @@ impl Multibody {
     }
 
     #[inline]
+    pub fn integrate(&mut self, dt: Real) {
+        for rb in self.links.iter_mut() {
+            rb.articulation
+                .integrate(dt, &self.velocities.as_slice()[rb.assembly_id..])
+        }
+    }
+
+    /*
+    #[inline]
     pub(crate) fn impulses(&self) -> &[Real] {
         self.impulses.as_slice()
     }
 
-    #[inline]
-    pub fn integrate(&mut self, parameters: &IntegrationParameters) {
-        for rb in self.links.iter_mut() {
-            rb.articulation
-                .integrate(parameters, &self.velocities.as_slice()[rb.assembly_id..])
-        }
-    }
 
     pub fn apply_displacement(&mut self, disp: &[Real]) {
         for rb in self.links.iter_mut() {
@@ -809,65 +809,46 @@ impl Multibody {
         self.update_body_jacobians(bodies);
     }
 
-    /*
     #[inline]
     pub fn ndofs(&self) -> usize {
         self.ndofs
     }
 
-    pub fn fill_constraint_geometry(
+    pub fn fill_jacobians(
         &self,
-        link: &MultibodyLink,
-        ndofs: usize, // FIXME: keep this parameter?
-        point: &Point<Real>,
-        force_dir: &ForceDirection<Real>,
-        j_id: usize,
-        wj_id: usize,
-        jacobians: &mut [Real],
-        inv_r: &mut Real,
-        ext_vels: Option<&DVectorSlice<Real>>,
-        out_vel: Option<&mut Real>,
-    ) {
-        let pos = point - link.com.coords;
-        let force = force_dir.at_point(&pos);
+        link_id: usize,
+        unit_force: Vector<Real>,
+        unit_torque: AngVector<Real>,
+        j_id: &mut usize,
+        jacobians: &mut DVector<Real>,
+    ) -> Real {
+        let wj_id = *j_id + self.ndofs;
+        let force = Force {
+            linear: unit_force,
+            angular: unit_torque,
+        };
 
-        match self.status() {
-            RigidBodyType::Dynamic => {
-                self.link_jacobian_mul_force(link, &force, &mut jacobians[j_id..]);
+        let link = &self.links[link_id];
+        let mut out_j = jacobians.rows_mut(*j_id, self.ndofs);
+        self.body_jacobians[link.internal_id].tr_mul_to(force.as_vector(), &mut out_j);
 
-                // FIXME: this could be optimized with a copy_nonoverlapping.
-                for i in 0..ndofs {
-                    jacobians[wj_id + i] = jacobians[j_id + i];
-                }
-
-                {
-                    let mut out = DVectorSliceMut::from_slice(&mut jacobians[wj_id..], self.ndofs);
-                    assert!(self.inv_augmented_mass.solve_mut(&mut out))
-                }
-
-                let j = DVectorSlice::from_slice(&jacobians[j_id..], ndofs);
-                let invm_j = DVectorSlice::from_slice(&jacobians[wj_id..], ndofs);
-
-                *inv_r += j.dot(&invm_j);
-
-                if let Some(out_vel) = out_vel {
-                    *out_vel += j.dot(&self.generalized_velocity());
-
-                    if let Some(ext_vels) = ext_vels {
-                        *out_vel += j.dot(ext_vels)
-                    }
-                }
-            }
-            RigidBodyType::Kinematic => {
-                if let Some(out_vel) = out_vel {
-                    *out_vel += force.as_vector().dot(&link.velocity.as_vector())
-                }
-            }
-            RigidBodyType::Static => {}
+        // TODO: Optimize with a copy_nonoverlapping?
+        for i in 0..self.ndofs {
+            jacobians[wj_id + i] = jacobians[*j_id + i];
         }
-    }
 
-     */
+        {
+            let mut out_invm_j = jacobians.rows_mut(wj_id, self.ndofs);
+            assert!(self.inv_augmented_mass.solve_mut(&mut out_invm_j))
+        }
+
+        let j = jacobians.rows(*j_id, self.ndofs);
+        let invm_j = jacobians.rows(wj_id, self.ndofs);
+
+        *j_id += self.ndofs * 2;
+
+        j.dot(&invm_j)
+    }
 
     /*
     #[inline]

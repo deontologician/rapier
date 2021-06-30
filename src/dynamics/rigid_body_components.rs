@@ -1,5 +1,5 @@
 use crate::data::{ComponentSetMut, ComponentSetOption};
-use crate::dynamics::MassProperties;
+use crate::dynamics::{MassProperties, MultibodyHandle};
 use crate::geometry::{
     ColliderChanges, ColliderHandle, ColliderMassProps, ColliderParent, ColliderPosition,
     ColliderShape,

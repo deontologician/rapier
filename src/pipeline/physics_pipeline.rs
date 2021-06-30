@@ -5,10 +5,10 @@ use crate::data::{BundleSet, ComponentSet, ComponentSetMut, ComponentSetOption};
 #[cfg(not(feature = "parallel"))]
 use crate::dynamics::IslandSolver;
 use crate::dynamics::{
-    CCDSolver, IntegrationParameters, IslandManager, JointSet, RigidBodyActivation, RigidBodyCcd,
-    RigidBodyChanges, RigidBodyColliders, RigidBodyDamping, RigidBodyDominance, RigidBodyForces,
-    RigidBodyHandle, RigidBodyIds, RigidBodyMassProps, RigidBodyPosition, RigidBodyType,
-    RigidBodyVelocity,
+    CCDSolver, IntegrationParameters, IslandManager, JointSet, MultibodySet, RigidBodyActivation,
+    RigidBodyCcd, RigidBodyChanges, RigidBodyColliders, RigidBodyDamping, RigidBodyDominance,
+    RigidBodyForces, RigidBodyHandle, RigidBodyIds, RigidBodyMassProps, RigidBodyPosition,
+    RigidBodyType, RigidBodyVelocity,
 };
 #[cfg(feature = "parallel")]
 use crate::dynamics::{JointGraphEdge, ParallelIslandSolver as IslandSolver};
@@ -86,6 +86,7 @@ impl PhysicsPipeline {
         broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         bodies: &mut Bodies,
+        multibodies: &MultibodySet,
         colliders: &mut Colliders,
         modified_colliders: &[ColliderHandle],
         removed_colliders: &[ColliderHandle],
@@ -145,6 +146,7 @@ impl PhysicsPipeline {
             integration_parameters.prediction_distance,
             bodies,
             colliders,
+            multibodies,
             modified_colliders,
             hooks,
             events,
@@ -218,6 +220,7 @@ impl PhysicsPipeline {
         bodies: &mut Bodies,
         colliders: &mut Colliders,
         joints: &mut JointSet,
+        multibodies: &mut MultibodySet,
     ) where
         Bodies: ComponentSetMut<RigidBodyPosition>
             + ComponentSetMut<RigidBodyVelocity>
@@ -274,6 +277,13 @@ impl PhysicsPipeline {
                 forces.add_gravity_acceleration(&gravity, effective_inv_mass)
             });
         }
+
+        for multibody in &mut multibodies.multibodies {
+            multibody
+                .1
+                .update_dynamics(integration_parameters.dt, bodies);
+            multibody.1.update_acceleration(bodies);
+        }
         self.counters.stages.update_time.pause();
 
         self.counters.stages.solver_time.resume();
@@ -297,6 +307,7 @@ impl PhysicsPipeline {
                     &self.manifold_indices[island_id],
                     joints.joints_mut(),
                     &self.joint_constraint_indices[island_id],
+                    multibodies,
                 )
             }
         }
@@ -486,6 +497,7 @@ impl PhysicsPipeline {
         bodies: &mut RigidBodySet,
         colliders: &mut ColliderSet,
         joints: &mut JointSet,
+        multibodies: &mut MultibodySet,
         ccd_solver: &mut CCDSolver,
         hooks: &dyn PhysicsHooks<RigidBodySet, ColliderSet>,
         events: &dyn EventHandler,
@@ -506,6 +518,7 @@ impl PhysicsPipeline {
             &mut modified_colliders,
             &mut removed_colliders,
             joints,
+            multibodies,
             ccd_solver,
             hooks,
             events,
@@ -526,6 +539,7 @@ impl PhysicsPipeline {
         modified_colliders: &mut Vec<ColliderHandle>,
         removed_colliders: &mut Vec<ColliderHandle>,
         joints: &mut JointSet,
+        multibodies: &mut MultibodySet,
         ccd_solver: &mut CCDSolver,
         hooks: &dyn PhysicsHooks<Bodies, Colliders>,
         events: &dyn EventHandler,
@@ -567,12 +581,19 @@ impl PhysicsPipeline {
             modified_colliders,
         );
 
+        // TODO: do this only on user-change.
+        // TODO: do we want some kind of automatic inverse kinematics?
+        for multibody in &mut multibodies.multibodies {
+            multibody.1.forward_kinematics(bodies);
+        }
+
         self.detect_collisions(
             integration_parameters,
             islands,
             broad_phase,
             narrow_phase,
             bodies,
+            multibodies,
             colliders,
             &modified_colliders[..],
             removed_colliders,
@@ -663,6 +684,7 @@ impl PhysicsPipeline {
                 bodies,
                 colliders,
                 joints,
+                multibodies,
             );
 
             // If CCD is enabled, execute the CCD motion clamping.
@@ -705,12 +727,18 @@ impl PhysicsPipeline {
                 modified_colliders,
                 clear_forces,
             );
+
+            for multibody in &mut multibodies.multibodies {
+                multibody.1.forward_kinematics(bodies);
+            }
+
             self.detect_collisions(
                 &integration_parameters,
                 islands,
                 broad_phase,
                 narrow_phase,
                 bodies,
+                multibodies,
                 colliders,
                 modified_colliders,
                 removed_colliders,

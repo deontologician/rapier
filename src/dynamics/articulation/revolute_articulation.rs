@@ -239,13 +239,13 @@ impl Articulation for RevoluteArticulation {
         out.copy_from((self.jacobian_dot_veldiff.transformed(transform) * acc[0]).as_vector())
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.angle += vels[0] * parameters.dt;
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.angle += vels[0] * dt;
         self.update_rot();
     }
 
     fn default_damping(&self, out: &mut DVectorSliceMut<Real>) {
-        out.fill(na::convert(0.1f64))
+        out.fill(na::convert(0.4f64))
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

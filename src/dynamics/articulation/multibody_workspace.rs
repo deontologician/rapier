@@ -3,6 +3,8 @@ use crate::math::Real;
 use na::DVector;
 
 /// A temporary workspace for various updates of the multibody.
+#[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
+#[derive(Clone)]
 pub(crate) struct MultibodyWorkspace {
     pub accs: Vec<RigidBodyVelocity>,
     pub ndofs_vec: DVector<Real>,

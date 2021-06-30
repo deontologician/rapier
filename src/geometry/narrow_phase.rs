@@ -2,7 +2,7 @@
 use rayon::prelude::*;
 
 use crate::data::{BundleSet, Coarena, ComponentSet, ComponentSetMut, ComponentSetOption};
-use crate::dynamics::CoefficientCombineRule;
+use crate::dynamics::{CoefficientCombineRule, MultibodySet};
 use crate::dynamics::{
     IslandManager, RigidBodyActivation, RigidBodyDominance, RigidBodyIds, RigidBodyType,
 };
@@ -809,6 +809,7 @@ impl NarrowPhase {
         prediction_distance: Real,
         bodies: &Bodies,
         colliders: &Colliders,
+        multibodies: &MultibodySet,
         modified_colliders: &[ColliderHandle],
         hooks: &dyn PhysicsHooks<Bodies, Colliders>,
         events: &dyn EventHandler,
@@ -948,11 +949,27 @@ impl NarrowPhase {
                 .map(|p2| *bodies.index(p2.handle.0))
                 .unwrap_or(zero);
 
+            // TODO: is this the best place to initialize the constraint mask?
+            let mut generic_constraint_mask = 0;
+
+            if let Some(co_parent1) = co_parent1 {
+                let needs_generic_constraint =
+                    multibodies.rigid_body_link(co_parent1.handle).is_some();
+                generic_constraint_mask = needs_generic_constraint as u8;
+            }
+
+            if let Some(co_parent2) = co_parent2 {
+                let needs_generic_constraint =
+                    multibodies.rigid_body_link(co_parent2.handle).is_some();
+                generic_constraint_mask |= (needs_generic_constraint as u8) << 1;
+            }
+
             for manifold in &mut pair.manifolds {
                 let world_pos1 = manifold.subshape_pos1.prepend_to(co_pos1);
                 manifold.data.solver_contacts.clear();
                 manifold.data.rigid_body1 = co_parent1.map(|p| p.handle);
                 manifold.data.rigid_body2 = co_parent2.map(|p| p.handle);
+                manifold.data.generic_constraint_mask = generic_constraint_mask;
                 manifold.data.solver_flags = solver_flags;
                 manifold.data.relative_dominance =
                     dominance1.effective_group(&rb_type1) - dominance2.effective_group(&rb_type2);

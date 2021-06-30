@@ -57,8 +57,8 @@ impl Articulation for CartesianArticulation {
 
     fn default_damping(&self, _: &mut DVectorSliceMut<Real>) {}
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.position += Vector::from_row_slice(&vels[..DIM]) * parameters.dt;
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.position += Vector::from_row_slice(&vels[..DIM]) * dt;
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

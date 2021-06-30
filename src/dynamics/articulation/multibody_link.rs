@@ -34,9 +34,9 @@ pub struct MultibodyLink {
 }
 
 impl MultibodyLink {
-    /*
     /// Creates a new multibody link.
     pub fn new(
+        rigid_body: RigidBodyHandle,
         internal_id: usize,
         assembly_id: usize,
         impulse_id: usize,
@@ -47,14 +47,10 @@ impl MultibodyLink {
         parent_to_world: Isometry<Real>,
         local_to_world: Isometry<Real>,
         local_to_parent: Isometry<Real>,
-        local_inertia: AngularInertia<Real>,
-        local_com: Point<Real>,
     ) -> Self {
         let is_leaf = true;
         let velocity_dot_wrt_joint = RigidBodyVelocity::zero();
         let velocity_wrt_joint = RigidBodyVelocity::zero();
-        let inertia = local_inertia; // XXX: .transformed(&local_to_world);
-        let com = local_to_world * local_com;
 
         MultibodyLink {
             name: String::new(),
@@ -71,14 +67,9 @@ impl MultibodyLink {
             local_to_parent,
             velocity_dot_wrt_joint,
             velocity_wrt_joint,
-            velocity,
-            local_inertia,
-            local_com,
-            inertia,
-            com,
+            rigid_body,
         }
     }
-    */
 
     /// Checks if this link is the root of the multibody.
     #[inline]

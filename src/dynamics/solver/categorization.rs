@@ -8,11 +8,14 @@ pub(crate) fn categorize_contacts(
     manifold_indices: &[ContactManifoldIndex],
     out_ground: &mut Vec<ContactManifoldIndex>,
     out_not_ground: &mut Vec<ContactManifoldIndex>,
+    out_generic: &mut Vec<ContactManifoldIndex>,
 ) {
     for manifold_i in manifold_indices {
         let manifold = &manifolds[*manifold_i];
 
-        if manifold.data.relative_dominance != 0 {
+        if manifold.data.generic_constraint_mask != 0 {
+            out_generic.push(*manifold_i);
+        } else if manifold.data.relative_dominance != 0 {
             out_ground.push(*manifold_i)
         } else {
             out_not_ground.push(*manifold_i)

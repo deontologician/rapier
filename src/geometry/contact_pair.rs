@@ -120,6 +120,9 @@ pub struct ContactManifoldData {
     /// The second rigid-body involved in this contact manifold.
     pub rigid_body2: Option<RigidBodyHandle>,
     pub(crate) warmstart_multiplier: Real,
+    // The first bit is 1 if rigid_body1 needs a generic constraint.
+    // The second bit is 1 if rigid_body2 needs a generic constraint.
+    pub(crate) generic_constraint_mask: u8,
     // The two following are set by the constraints solver.
     #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pub(crate) constraint_index: usize,
@@ -222,6 +225,7 @@ impl ContactManifoldData {
         Self {
             rigid_body1,
             rigid_body2,
+            generic_constraint_mask: 0,
             warmstart_multiplier: Self::min_warmstart_multiplier(),
             constraint_index: 0,
             position_constraint_index: 0,

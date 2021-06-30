@@ -88,12 +88,12 @@ impl Articulation for BallArticulation {
     }
 
     fn default_damping(&self, out: &mut DVectorSliceMut<Real>) {
-        out.fill(na::convert(0.1f64))
+        out.fill(na::convert(0.4f64))
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
         let angvel = Vector3::from_row_slice(&vels[..3]);
-        let disp = UnitQuaternion::new_eps(angvel * parameters.dt, 0.0);
+        let disp = UnitQuaternion::new_eps(angvel * dt, 0.0);
         self.rot = disp * self.rot;
     }
 

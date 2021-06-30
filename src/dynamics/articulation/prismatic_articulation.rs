@@ -193,8 +193,8 @@ impl Articulation for PrismaticArticulation {
 
     fn default_damping(&self, _: &mut DVectorSliceMut<Real>) {}
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.offset += vels[0] * parameters.dt
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.offset += vels[0] * dt
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

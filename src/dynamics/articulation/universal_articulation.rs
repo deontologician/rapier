@@ -117,9 +117,9 @@ impl Articulation for UniversalArticulation {
         self.revo2.default_damping(&mut out.rows_mut(1, 1));
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.revo1.integrate(parameters, vels);
-        self.revo2.integrate(parameters, &[vels[1]]);
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.revo1.integrate(dt, vels);
+        self.revo2.integrate(dt, &[vels[1]]);
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

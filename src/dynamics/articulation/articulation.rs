@@ -19,7 +19,7 @@ pub trait Articulation: DowncastSync {
     /// Update the jacobians of this articulation.
     fn update_jacobians(&mut self, body_shift: &Vector<Real>, vels: &[Real]);
     /// Integrate the position of this articulation.
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]);
+    fn integrate(&mut self, dt: Real, vels: &[Real]);
     /// Apply a displacement to the articulation.
     fn apply_displacement(&mut self, disp: &[Real]);
 

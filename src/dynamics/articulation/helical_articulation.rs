@@ -92,8 +92,8 @@ impl Articulation for HelicalArticulation {
         out.fill(na::convert(0.1f64))
     }
 
-    fn integrate(&mut self, parameters: &IntegrationParameters, vels: &[Real]) {
-        self.revo.integrate(parameters, vels)
+    fn integrate(&mut self, dt: Real, vels: &[Real]) {
+        self.revo.integrate(dt, vels)
     }
 
     fn apply_displacement(&mut self, disp: &[Real]) {

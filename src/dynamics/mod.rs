@@ -31,6 +31,7 @@ pub use self::rigid_body::{RigidBody, RigidBodyBuilder};
 #[cfg(feature = "default-sets")]
 pub use self::rigid_body_set::{BodyPair, RigidBodySet};
 
+mod articulation;
 mod ccd;
 mod coefficient_combine_rule;
 mod integration_parameters;
@@ -38,11 +39,6 @@ mod island_manager;
 mod joint;
 mod rigid_body_components;
 mod solver;
-
-mod articulation;
-mod multibody;
-mod multibody_link;
-mod multibody_workspace;
 
 #[cfg(feature = "default-sets")]
 mod rigid_body;
