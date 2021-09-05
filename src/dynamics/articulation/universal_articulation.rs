@@ -1,8 +1,6 @@
 use na::{self, DVectorSliceMut, Isometry3, Translation3, Unit, Vector3};
 
-use crate::dynamics::{
-    Articulation, IntegrationParameters, RevoluteArticulation, RigidBodyVelocity,
-};
+use crate::dynamics::{Articulation, RevoluteArticulation, RigidBodyVelocity};
 use crate::math::{JacobianSliceMut, Real};
 
 /// A articulation that allows only two relative rotations between two multibody links.

@@ -1,8 +1,6 @@
 use na::{self, DVectorSliceMut, Isometry3, Translation3, Unit, Vector3};
 
-use crate::dynamics::{
-    Articulation, IntegrationParameters, PrismaticArticulation, RigidBodyVelocity,
-};
+use crate::dynamics::{Articulation, PrismaticArticulation, RigidBodyVelocity};
 use crate::math::{JacobianSliceMut, Real};
 
 /// A articulation that allows two translational degrees of freedom.

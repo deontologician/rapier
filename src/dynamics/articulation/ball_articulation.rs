@@ -2,7 +2,7 @@ use na::{
     self, DVectorSliceMut, Isometry3, Matrix3, Translation3, UnitQuaternion, Vector3, VectorSlice3,
 };
 
-use crate::dynamics::{Articulation, IntegrationParameters, RigidBodyVelocity};
+use crate::dynamics::{Articulation, RigidBodyVelocity};
 use crate::math::{JacobianSliceMut, Real};
 use crate::utils::WCrossMatrix;
 

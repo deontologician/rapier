@@ -3,7 +3,7 @@
 use downcast_rs::{impl_downcast, DowncastSync};
 use na::DVectorSliceMut;
 
-use crate::dynamics::{IntegrationParameters, RigidBodyVelocity};
+use crate::dynamics::RigidBodyVelocity;
 use crate::math::{Isometry, JacobianSliceMut, Real, Vector};
 
 /// Trait implemented by all articulations following the reduced-coordinate formation.

@@ -1,6 +1,6 @@
 use na::DVectorSliceMut;
 
-use crate::dynamics::{Articulation, IntegrationParameters, RigidBodyVelocity};
+use crate::dynamics::{Articulation, RigidBodyVelocity};
 use crate::math::{Isometry, JacobianSliceMut, Real, Vector, SPATIAL_DIM};
 
 /// A articulation that allows all the relative degrees of freedom between two multibody links.
@@ -29,6 +29,10 @@ impl FreeArticulation {
 impl Articulation for FreeArticulation {
     fn ndofs(&self) -> usize {
         SPATIAL_DIM
+    }
+
+    fn nimpulses(&self) -> usize {
+        0
     }
 
     fn body_to_parent(&self, _: &Vector<Real>, _: &Vector<Real>) -> Isometry<Real> {

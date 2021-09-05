@@ -1,24 +1,20 @@
 use crate::data::{BundleSet, ComponentSet};
-use crate::dynamics::solver::{
-    GenericRhs, VelocityConstraint, VelocityConstraintTangentPart, VelocityGroundConstraint,
-};
-#[cfg(feature = "simd-is-enabled")]
-use crate::dynamics::solver::{WVelocityConstraint, WVelocityGroundConstraint};
+use crate::dynamics::solver::{GenericRhs, VelocityConstraint};
 use crate::dynamics::{
-    IntegrationParameters, Multibody, MultibodySet, RigidBodyIds, RigidBodyMassProps,
-    RigidBodyType, RigidBodyVelocity,
+    ArticulationSet, IntegrationParameters, RigidBodyIds, RigidBodyMassProps, RigidBodyType,
+    RigidBodyVelocity,
 };
 use crate::geometry::{ContactManifold, ContactManifoldIndex};
-use crate::math::{Real, Vector, DIM, MAX_MANIFOLD_POINTS};
-use crate::utils::{WAngularInertia, WBasis, WCross, WDot};
+use crate::math::{Real, DIM, MAX_MANIFOLD_POINTS};
+use crate::utils::{WAngularInertia, WCross, WDot};
 
 use super::{DeltaVel, VelocityConstraintElement, VelocityConstraintNormalPart};
 use na::DVector;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct GenericVelocityConstraint {
-    // We just build the generic constraint on top of the velocity constraints
-    // adding some information we can use in the multibody case.
+    // We just build the generic constraint on top of the velocity constraint,
+    // adding some information we can use in the generic case.
     pub velocity_constraint: VelocityConstraint,
     pub j_id: usize,
     pub ndofs1: usize,
@@ -32,7 +28,7 @@ impl GenericVelocityConstraint {
         manifold_id: ContactManifoldIndex,
         manifold: &ContactManifold,
         bodies: &Bodies,
-        multibodies: &MultibodySet,
+        multibodies: &ArticulationSet,
         out_constraints: &mut Vec<GenericVelocityConstraint>,
         jacobians: &mut DVector<Real>,
         jacobian_id: &mut usize,
@@ -63,10 +59,10 @@ impl GenericVelocityConstraint {
 
         let multibody1 = multibodies
             .rigid_body_link(handle1)
-            .map(|m| (&multibodies[m.0], m.1));
+            .map(|m| (&multibodies[m.multibody], m.id));
         let multibody2 = multibodies
             .rigid_body_link(handle2)
-            .map(|m| (&multibodies[m.0], m.1));
+            .map(|m| (&multibodies[m.multibody], m.id));
         let mj_lambda1 = multibody1
             .map(|mb| mb.0.solver_id)
             .unwrap_or(if rb_type1.is_dynamic() {

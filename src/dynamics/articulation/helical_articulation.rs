@@ -1,8 +1,7 @@
 use na::{self, DVectorSliceMut, Isometry3, Translation3, Unit, Vector3};
 
 use crate::dynamics::{
-    Articulation, ArticulationMotor, IntegrationParameters, RevoluteArticulation,
-    RigidBodyVelocity, UnitArticulation,
+    Articulation, ArticulationMotor, RevoluteArticulation, RigidBodyVelocity, UnitArticulation,
 };
 use crate::math::{JacobianSliceMut, Real};
 

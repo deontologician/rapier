@@ -1,8 +1,7 @@
 use na::{DVectorSliceMut, Isometry3, Unit, Vector3};
 
 use crate::dynamics::{
-    Articulation, IntegrationParameters, PrismaticArticulation, RevoluteArticulation,
-    RigidBodyVelocity,
+    Articulation, PrismaticArticulation, RevoluteArticulation, RigidBodyVelocity,
 };
 use crate::math::{JacobianSliceMut, Real};
 use approx::AbsDiffEq;

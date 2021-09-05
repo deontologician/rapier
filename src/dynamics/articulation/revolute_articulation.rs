@@ -2,9 +2,7 @@
 
 use na::{self, DVectorSliceMut, Unit};
 
-use crate::dynamics::{
-    Articulation, ArticulationMotor, IntegrationParameters, RigidBodyVelocity, UnitArticulation,
-};
+use crate::dynamics::{Articulation, ArticulationMotor, RigidBodyVelocity, UnitArticulation};
 use crate::math::{AngVector, Isometry, JacobianSliceMut, Real, Rotation, Translation, Vector};
 use crate::utils::WCross;
 

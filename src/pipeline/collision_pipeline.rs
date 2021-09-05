@@ -2,7 +2,7 @@
 
 use crate::data::{ComponentSet, ComponentSetMut, ComponentSetOption};
 use crate::dynamics::{
-    MultibodySet, RigidBodyActivation, RigidBodyChanges, RigidBodyColliders, RigidBodyDominance,
+    ArticulationSet, RigidBodyActivation, RigidBodyChanges, RigidBodyColliders, RigidBodyDominance,
     RigidBodyHandle, RigidBodyIds, RigidBodyPosition, RigidBodyType, RigidBodyVelocity,
 };
 use crate::geometry::{
@@ -55,7 +55,7 @@ impl CollisionPipeline {
         narrow_phase: &mut NarrowPhase,
         bodies: &mut Bodies,
         colliders: &mut Colliders,
-        multibodies: &MultibodySet,
+        multibodies: &ArticulationSet,
         modified_colliders: &[ColliderHandle],
         removed_colliders: &[ColliderHandle],
         hooks: &dyn PhysicsHooks<Bodies, Colliders>,
@@ -130,7 +130,7 @@ impl CollisionPipeline {
         broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         bodies: &mut RigidBodySet,
-        multibodies: &MultibodySet,
+        multibodies: &ArticulationSet,
         colliders: &mut ColliderSet,
         hooks: &dyn PhysicsHooks<RigidBodySet, ColliderSet>,
         events: &dyn EventHandler,
@@ -161,7 +161,7 @@ impl CollisionPipeline {
         broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         bodies: &mut Bodies,
-        multibodies: &MultibodySet,
+        multibodies: &ArticulationSet,
         colliders: &mut Colliders,
         modified_bodies: &mut Vec<RigidBodyHandle>,
         modified_colliders: &mut Vec<ColliderHandle>,

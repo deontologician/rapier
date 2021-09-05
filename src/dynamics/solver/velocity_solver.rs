@@ -3,7 +3,7 @@ use crate::data::{BundleSet, ComponentSet, ComponentSetMut};
 use crate::dynamics::solver::GenericVelocityConstraint;
 use crate::dynamics::{
     solver::{AnyVelocityConstraint, DeltaVel},
-    IntegrationParameters, JointGraphEdge, MultibodySet, RigidBodyForces, RigidBodyVelocity,
+    ArticulationSet, IntegrationParameters, JointGraphEdge, RigidBodyForces, RigidBodyVelocity,
 };
 use crate::dynamics::{IslandManager, RigidBodyIds, RigidBodyMassProps};
 use crate::geometry::ContactManifold;
@@ -30,7 +30,7 @@ impl VelocitySolver {
         params: &IntegrationParameters,
         islands: &IslandManager,
         bodies: &mut Bodies,
-        multibodies: &mut MultibodySet,
+        multibodies: &mut ArticulationSet,
         manifolds_all: &mut [&mut ContactManifold],
         joints_all: &mut [JointGraphEdge],
         contact_constraints: &mut [AnyVelocityConstraint],
@@ -126,7 +126,7 @@ impl VelocitySolver {
         }
 
         for (_, multibody) in multibodies.multibodies.iter_mut() {
-            let mut mj_lambdas = self
+            let mj_lambdas = self
                 .generic_mj_lambdas
                 .rows(multibody.solver_id, multibody.ndofs());
             multibody.velocities += mj_lambdas;

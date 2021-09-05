@@ -36,7 +36,7 @@ pub(self) use velocity_ground_constraint_wide::*;
 
 mod categorization;
 mod delta_vel;
-// mod generic_velocity_constraint;
+mod generic_position_constraint;
 mod generic_velocity_constraint;
 mod generic_velocity_constraint_element;
 mod interaction_groups;

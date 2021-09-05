@@ -1,6 +1,6 @@
 use crossbeam::channel::Receiver;
 use rapier::dynamics::{
-    CCDSolver, IntegrationParameters, IslandManager, JointSet, MultibodySet, RigidBodySet,
+    ArticulationSet, CCDSolver, IntegrationParameters, IslandManager, JointSet, RigidBodySet,
 };
 use rapier::geometry::{BroadPhase, ColliderSet, ContactEvent, IntersectionEvent, NarrowPhase};
 use rapier::math::Vector;
@@ -76,7 +76,7 @@ pub struct PhysicsState {
     pub bodies: RigidBodySet,
     pub colliders: ColliderSet,
     pub joints: JointSet,
-    pub multibodies: MultibodySet,
+    pub articulations: ArticulationSet,
     pub ccd_solver: CCDSolver,
     pub pipeline: PhysicsPipeline,
     pub query_pipeline: QueryPipeline,
@@ -94,7 +94,7 @@ impl PhysicsState {
             bodies: RigidBodySet::new(),
             colliders: ColliderSet::new(),
             joints: JointSet::new(),
-            multibodies: MultibodySet::new(),
+            articulations: ArticulationSet::new(),
             ccd_solver: CCDSolver::new(),
             pipeline: PhysicsPipeline::new(),
             query_pipeline: QueryPipeline::new(),

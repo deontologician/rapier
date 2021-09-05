@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::dynamics::{Articulation, RigidBodyHandle};
-use crate::math::{AngularInertia, Isometry, Point, Real, Vector};
+use crate::math::{Isometry, Real, Vector};
 use crate::prelude::RigidBodyVelocity;
 
 /// One link of a multibody.
@@ -13,8 +13,6 @@ pub struct MultibodyLink {
     pub(crate) impulse_id: usize,
     pub(crate) is_leaf: bool,
 
-    // XXX: rename to "articulation".
-    // (And rename the full-coordinates articulation constraints ArticulationConstraint).
     pub(crate) parent_internal_id: usize,
     pub(crate) articulation: Box<dyn Articulation>,
     pub(crate) parent_shift: Vector<Real>,
@@ -69,6 +67,10 @@ impl MultibodyLink {
             velocity_wrt_joint,
             rigid_body,
         }
+    }
+
+    pub fn rigid_body_handle(&self) -> RigidBodyHandle {
+        self.rigid_body
     }
 
     /// Checks if this link is the root of the multibody.

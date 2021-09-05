@@ -1,6 +1,6 @@
 use na::{self, DVectorSliceMut};
 
-use crate::dynamics::{Articulation, IntegrationParameters, RigidBodyVelocity};
+use crate::dynamics::{Articulation, RigidBodyVelocity};
 use crate::math::{Isometry, JacobianSliceMut, Real, Translation, Vector, DIM};
 
 /// A articulation that allows only all the translational degrees of freedom between two multibody links.

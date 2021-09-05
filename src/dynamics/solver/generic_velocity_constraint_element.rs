@@ -3,8 +3,8 @@ use crate::dynamics::solver::{
     VelocityConstraintElement, VelocityConstraintNormalPart, VelocityConstraintTangentPart,
 };
 use crate::math::{AngVector, Real, Vector, DIM};
-use crate::utils::{WBasis, WDot};
-use na::{DVector, SimdRealField};
+use crate::utils::WDot;
+use na::DVector;
 
 pub(crate) enum GenericRhs {
     DeltaVel(DeltaVel<Real>),
@@ -419,7 +419,7 @@ impl VelocityConstraintElement<Real> {
         #[cfg(feature = "dim2")]
         let tangents1 = [&dir1.orthonormal_vector()];
         let mut tng_j_id = tangent_j_id(j_id, ndofs1, ndofs2);
-        println!("Solving constraint");
+
         for element in elements.iter_mut() {
             let limit = limit * element.normal_part.impulse;
             let part = &mut element.tangent_part;

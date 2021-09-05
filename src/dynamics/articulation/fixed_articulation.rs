@@ -2,7 +2,7 @@ use na::DVectorSliceMut;
 
 use crate::dynamics::Articulation;
 
-use crate::dynamics::{IntegrationParameters, RigidBodyVelocity};
+use crate::dynamics::RigidBodyVelocity;
 use crate::math::{Isometry, JacobianSliceMut, Real, Translation, Vector};
 
 /// A articulation that does not allow any relative degrees of freedom.
@@ -25,6 +25,10 @@ impl FixedArticulation {
 
 impl Articulation for FixedArticulation {
     fn ndofs(&self) -> usize {
+        0
+    }
+
+    fn nimpulses(&self) -> usize {
         0
     }
 

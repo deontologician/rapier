@@ -5,10 +5,10 @@ use crate::data::{BundleSet, ComponentSet, ComponentSetMut, ComponentSetOption};
 #[cfg(not(feature = "parallel"))]
 use crate::dynamics::IslandSolver;
 use crate::dynamics::{
-    CCDSolver, IntegrationParameters, IslandManager, JointSet, MultibodySet, RigidBodyActivation,
-    RigidBodyCcd, RigidBodyChanges, RigidBodyColliders, RigidBodyDamping, RigidBodyDominance,
-    RigidBodyForces, RigidBodyHandle, RigidBodyIds, RigidBodyMassProps, RigidBodyPosition,
-    RigidBodyType, RigidBodyVelocity,
+    ArticulationSet, CCDSolver, IntegrationParameters, IslandManager, JointSet,
+    RigidBodyActivation, RigidBodyCcd, RigidBodyChanges, RigidBodyColliders, RigidBodyDamping,
+    RigidBodyDominance, RigidBodyForces, RigidBodyHandle, RigidBodyIds, RigidBodyMassProps,
+    RigidBodyPosition, RigidBodyType, RigidBodyVelocity,
 };
 #[cfg(feature = "parallel")]
 use crate::dynamics::{JointGraphEdge, ParallelIslandSolver as IslandSolver};
@@ -86,7 +86,7 @@ impl PhysicsPipeline {
         broad_phase: &mut BroadPhase,
         narrow_phase: &mut NarrowPhase,
         bodies: &mut Bodies,
-        multibodies: &MultibodySet,
+        multibodies: &ArticulationSet,
         colliders: &mut Colliders,
         modified_colliders: &[ColliderHandle],
         removed_colliders: &[ColliderHandle],
@@ -162,8 +162,11 @@ impl PhysicsPipeline {
         integration_parameters: &IntegrationParameters,
         islands: &IslandManager,
         bodies: &mut Bodies,
+        multibodies: &mut ArticulationSet,
     ) where
-        Bodies: ComponentSet<RigidBodyIds> + ComponentSetMut<RigidBodyPosition>,
+        Bodies: ComponentSet<RigidBodyIds>
+            + ComponentSetMut<RigidBodyPosition>
+            + ComponentSetMut<RigidBodyMassProps>,
     {
         #[cfg(not(feature = "parallel"))]
         {
@@ -176,6 +179,7 @@ impl PhysicsPipeline {
                     &mut self.counters,
                     integration_parameters,
                     bodies,
+                    multibodies,
                 )
             }
         }
@@ -220,7 +224,7 @@ impl PhysicsPipeline {
         bodies: &mut Bodies,
         colliders: &mut Colliders,
         joints: &mut JointSet,
-        multibodies: &mut MultibodySet,
+        multibodies: &mut ArticulationSet,
     ) where
         Bodies: ComponentSetMut<RigidBodyPosition>
             + ComponentSetMut<RigidBodyVelocity>
@@ -497,7 +501,7 @@ impl PhysicsPipeline {
         bodies: &mut RigidBodySet,
         colliders: &mut ColliderSet,
         joints: &mut JointSet,
-        multibodies: &mut MultibodySet,
+        multibodies: &mut ArticulationSet,
         ccd_solver: &mut CCDSolver,
         hooks: &dyn PhysicsHooks<RigidBodySet, ColliderSet>,
         events: &dyn EventHandler,
@@ -539,7 +543,7 @@ impl PhysicsPipeline {
         modified_colliders: &mut Vec<ColliderHandle>,
         removed_colliders: &mut Vec<ColliderHandle>,
         joints: &mut JointSet,
-        multibodies: &mut MultibodySet,
+        multibodies: &mut ArticulationSet,
         ccd_solver: &mut CCDSolver,
         hooks: &dyn PhysicsHooks<Bodies, Colliders>,
         events: &dyn EventHandler,
@@ -584,6 +588,7 @@ impl PhysicsPipeline {
         // TODO: do this only on user-change.
         // TODO: do we want some kind of automatic inverse kinematics?
         for multibody in &mut multibodies.multibodies {
+            multibody.1.update_root_type(bodies);
             multibody.1.forward_kinematics(bodies);
         }
 
@@ -717,7 +722,7 @@ impl PhysicsPipeline {
             //       This happens because our CCD use the real rigid-body
             //       velocities instead of just interpolating between
             //       isometries.
-            self.solve_position_constraints(&integration_parameters, islands, bodies);
+            self.solve_position_constraints(&integration_parameters, islands, bodies, multibodies);
 
             let clear_forces = remaining_substeps == 0;
             self.advance_to_final_positions(

@@ -2,7 +2,7 @@
 use rayon::prelude::*;
 
 use crate::data::{BundleSet, Coarena, ComponentSet, ComponentSetMut, ComponentSetOption};
-use crate::dynamics::{CoefficientCombineRule, MultibodySet};
+use crate::dynamics::{ArticulationSet, CoefficientCombineRule};
 use crate::dynamics::{
     IslandManager, RigidBodyActivation, RigidBodyDominance, RigidBodyIds, RigidBodyType,
 };
@@ -809,7 +809,7 @@ impl NarrowPhase {
         prediction_distance: Real,
         bodies: &Bodies,
         colliders: &Colliders,
-        multibodies: &MultibodySet,
+        multibodies: &ArticulationSet,
         modified_colliders: &[ColliderHandle],
         hooks: &dyn PhysicsHooks<Bodies, Colliders>,
         events: &dyn EventHandler,

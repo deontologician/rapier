@@ -46,7 +46,7 @@ fn create_prismatic_joints(
         prism.limits[0] = -2.0;
         prism.limits[1] = 2.0;
 
-        joints.insert(bodies, curr_parent, curr_child, prism);
+        joints.insert(curr_parent, curr_child, prism);
 
         curr_parent = curr_child;
     }
@@ -113,7 +113,7 @@ fn create_actuated_prismatic_joints(
             prism.limits[1] = 5.0;
         }
 
-        joints.insert(bodies, curr_parent, curr_child, prism);
+        joints.insert(curr_parent, curr_child, prism);
 
         curr_parent = curr_child;
     }
@@ -122,7 +122,7 @@ fn create_actuated_prismatic_joints(
 fn create_revolute_articulations(
     bodies: &mut RigidBodySet,
     colliders: &mut ColliderSet,
-    multibodies: &mut MultibodySet,
+    articulations: &mut ArticulationSet,
     origin: Point<f32>,
     num: usize,
 ) {
@@ -131,7 +131,7 @@ fn create_revolute_articulations(
 
     let mut multibody = Multibody::new();
 
-    let ground = RigidBodyBuilder::new_static()
+    let ground = RigidBodyBuilder::new_dynamic() // new_static()
         .translation(vector![origin.x, origin.y, 0.0])
         .build();
     let mut curr_parent = bodies.insert(ground);
@@ -178,19 +178,17 @@ fn create_revolute_articulations(
         ];
 
         for k in 0..4 {
-            multibody.add_link(
-                Some(i * 4 + k),
-                Box::new(RevoluteArticulation::new(revs[k].0, 0.0)),
+            articulations.insert(
+                curr_parent,
+                handles[k],
+                RevoluteArticulation::new(revs[k].0, 0.0),
                 Vector::zeros(),
                 revs[k].1,
-                handles[k],
             );
+
+            curr_parent = handles[k];
         }
-
-        curr_parent = handles[3];
     }
-
-    multibodies.insert(multibody);
 }
 
 fn create_fixed_joints(
@@ -237,7 +235,7 @@ fn create_fixed_joints(
                     Isometry::identity(),
                     Isometry::translation(0.0, 0.0, -shift),
                 );
-                joints.insert(bodies, parent_handle, child_handle, joint);
+                joints.insert(parent_handle, child_handle, joint);
             }
 
             // Horizontal joint.
@@ -248,7 +246,7 @@ fn create_fixed_joints(
                     Isometry::identity(),
                     Isometry::translation(-shift, 0.0, 0.0),
                 );
-                joints.insert(bodies, parent_handle, child_handle, joint);
+                joints.insert(parent_handle, child_handle, joint);
             }
 
             body_handles.push(child_handle);
@@ -259,14 +257,14 @@ fn create_fixed_joints(
 fn create_ball_articulations(
     bodies: &mut RigidBodySet,
     colliders: &mut ColliderSet,
-    multibodies: &mut MultibodySet,
+    articulations: &mut ArticulationSet,
     num: usize,
 ) {
     let rad = 0.4;
     let shift = 1.0;
 
-    let mut body_handles = Vec::new();
     let mut multibody = Multibody::new();
+    let mut parent_handle = RigidBodyHandle::invalid();
 
     for i in 0..num {
         let fi = i as f32;
@@ -287,28 +285,17 @@ fn create_ball_articulations(
 
         if i > 0 {
             let articulation = BallArticulation::new(Vector::zeros());
-            multibody.add_link(
-                Some(i - 1),
-                Box::new(articulation),
+            articulations.insert(
+                parent_handle,
+                child_handle,
+                articulation,
                 Vector::zeros(),
                 vector![0.0, 0.0, -shift * 2.0],
-                child_handle,
-            );
-        } else {
-            let articulation = FixedArticulation::new(Isometry::identity());
-            multibody.add_link(
-                None,
-                Box::new(articulation),
-                Vector::zeros(),
-                Vector::zeros(),
-                child_handle,
             );
         }
 
-        body_handles.push(child_handle);
+        parent_handle = child_handle;
     }
-
-    multibodies.insert(multibody);
 }
 
 fn create_actuated_revolute_joints(
@@ -370,7 +357,7 @@ fn create_actuated_revolute_joints(
                 joint.configure_motor_velocity(-2.0, 0.1);
             }
 
-            joints.insert(bodies, parent_handle, child_handle, joint);
+            joints.insert(parent_handle, child_handle, joint);
         }
 
         parent_handle = child_handle;
@@ -428,7 +415,7 @@ fn create_actuated_ball_joints(
                 );
             }
 
-            joints.insert(bodies, parent_handle, child_handle, joint);
+            joints.insert(parent_handle, child_handle, joint);
         }
 
         parent_handle = child_handle;
@@ -442,7 +429,7 @@ pub fn init_world(testbed: &mut Testbed) {
     let mut bodies = RigidBodySet::new();
     let mut colliders = ColliderSet::new();
     let mut joints = JointSet::new();
-    let mut multibodies = MultibodySet::new();
+    let mut articulations = ArticulationSet::new();
 
     let rigid_body = RigidBodyBuilder::new_static().build();
     let collider = ColliderBuilder::cuboid(30.0, 0.01, 30.0) // Vector::y_axis())
@@ -465,13 +452,15 @@ pub fn init_world(testbed: &mut Testbed) {
     //     point![25.0, 5.0, 0.0],
     //     4,
     // );
+    /*
     create_revolute_articulations(
         &mut bodies,
         &mut colliders,
-        &mut multibodies,
+        &mut articulations,
         point![20.0, 0.0, 0.0],
-        1, // 3,
+        3,
     );
+     */
     // create_fixed_joints(
     //     &mut bodies,
     //     &mut colliders,
@@ -493,12 +482,12 @@ pub fn init_world(testbed: &mut Testbed) {
     //     point![13.0, 10.0, 0.0],
     //     3,
     // );
-    create_ball_articulations(&mut bodies, &mut colliders, &mut multibodies, 3); // 15);
+    create_ball_articulations(&mut bodies, &mut colliders, &mut articulations, 2); // 15);
 
     /*
      * Set up the testbed.
      */
     testbed.set_world(bodies, colliders, joints);
-    testbed.harness_mut().physics.multibodies = multibodies;
+    testbed.harness_mut().physics.articulations = articulations;
     testbed.look_at(point![15.0, 5.0, 42.0], point![13.0, 1.0, 1.0]);
 }

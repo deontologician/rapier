@@ -3,11 +3,12 @@ pub(self) use ball_position_constraint::{BallPositionConstraint, BallPositionGro
 pub(self) use ball_position_constraint_wide::{
     WBallPositionConstraint, WBallPositionGroundConstraint,
 };
-pub(self) use ball_velocity_constraint::{BallVelocityConstraint, BallVelocityGroundConstraint};
+pub(self) use ball_velocity_constraint::BallVelocityConstraint;
 #[cfg(feature = "simd-is-enabled")]
 pub(self) use ball_velocity_constraint_wide::{
     WBallVelocityConstraint, WBallVelocityGroundConstraint,
 };
+pub(self) use ball_velocity_ground_constraint::BallVelocityGroundConstraint;
 pub(self) use fixed_position_constraint::{FixedPositionConstraint, FixedPositionGroundConstraint};
 #[cfg(feature = "simd-is-enabled")]
 pub(self) use fixed_position_constraint_wide::{
@@ -18,6 +19,7 @@ pub(self) use fixed_velocity_constraint::{FixedVelocityConstraint, FixedVelocity
 pub(self) use fixed_velocity_constraint_wide::{
     WFixedVelocityConstraint, WFixedVelocityGroundConstraint,
 };
+
 // pub(self) use generic_position_constraint::{
 //     GenericPositionConstraint, GenericPositionGroundConstraint,
 // };
@@ -84,6 +86,7 @@ mod fixed_velocity_constraint_wide;
 // mod generic_velocity_constraint;
 // #[cfg(feature = "simd-is-enabled")]
 // mod generic_velocity_constraint_wide;
+mod ball_velocity_ground_constraint;
 mod joint_constraint;
 mod joint_position_constraint;
 mod prismatic_position_constraint;

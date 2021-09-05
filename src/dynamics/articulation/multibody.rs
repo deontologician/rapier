@@ -2,17 +2,17 @@ use super::multibody_link::{MultibodyLink, MultibodyLinkVec};
 use super::multibody_workspace::MultibodyWorkspace;
 use crate::data::{BundleSet, Coarena, ComponentSet, ComponentSetMut};
 use crate::dynamics::{
-    Articulation, IntegrationParameters, RigidBodyHandle, RigidBodyMassProps, RigidBodyPosition,
-    RigidBodyType, RigidBodyVelocity,
+    Articulation, FixedArticulation, FreeArticulation, IntegrationParameters, RigidBodyForces,
+    RigidBodyHandle, RigidBodyMassProps, RigidBodyPosition, RigidBodyType, RigidBodyVelocity,
 };
 use crate::math::{
     AngDim, AngVector, AngularInertia, Dim, Isometry, Jacobian, Matrix, Point, Real, Vector, DIM,
     SPATIAL_DIM,
 };
-use crate::prelude::RigidBodyForces;
 use crate::utils::{IndexMut2, WAngularInertia, WCross, WCrossMatrix};
 use na::{
-    self, DMatrix, DVector, DVectorSlice, DVectorSliceMut, Dynamic, OMatrix, SMatrix, SVector, LU,
+    self, Const, DMatrix, DVector, DVectorSlice, DVectorSliceMut, Dynamic, MatrixSlice,
+    MatrixSliceMut, OMatrix, SMatrix, SVector, LU,
 };
 
 #[cfg(feature = "dim2")]
@@ -74,6 +74,7 @@ pub struct Multibody {
     augmented_mass: DMatrix<Real>,
     inv_augmented_mass: LU<Real, Dynamic, Dynamic>,
     ndofs: usize,
+    root_is_dynamic: bool,
     pub(crate) solver_id: usize,
 
     /*
@@ -109,8 +110,93 @@ impl Multibody {
             coriolis_v: Vec::new(),
             coriolis_w: Vec::new(),
             i_coriolis_dt: Jacobian::zeros(0),
+            root_is_dynamic: true,
             // solver_workspace: Some(SolverWorkspace::new()),
         }
+    }
+
+    pub fn with_root(handle: RigidBodyHandle) -> Self {
+        let mut mb = Multibody::new();
+        let articulation = FreeArticulation::new(Isometry::identity());
+        mb.add_link(
+            None,
+            Box::new(articulation),
+            Vector::zeros(),
+            Vector::zeros(),
+            handle,
+        );
+        mb
+    }
+
+    pub fn append(
+        &mut self,
+        mut rhs: Multibody,
+        parent: usize,
+        articulation: Box<dyn Articulation>,
+        parent_shift: Vector<Real>,
+        body_shift: Vector<Real>,
+    ) {
+        let rhs_copy_shift = self.ndofs + SPATIAL_DIM;
+        let rhs_copy_ndofs = if rhs.ndofs == 0 {
+            0
+        } else {
+            // Note that if `rhs.ndofs` isn’t 0, then it must be
+            // at least equal to `SPATIAL_DIM` (because the root
+            // has a free articulation). So this subtraction won’t
+            // underflow.
+            rhs.ndofs - SPATIAL_DIM
+        };
+
+        // Adjust the ids of all the rhs links except the first one.
+        let mut base_assembly_id = self.velocities.len() - SPATIAL_DIM + articulation.ndofs();
+        let mut base_impulse_id = self.impulses.len() + articulation.nimpulses();
+        let mut base_internal_id = self.links.len() + 1;
+        let mut base_parent_id = self.links.len();
+
+        for link in &mut rhs.links.0[1..] {
+            link.assembly_id += base_assembly_id;
+            link.impulse_id += base_impulse_id;
+            link.internal_id += base_internal_id;
+            link.parent_internal_id += base_parent_id;
+        }
+
+        // Adjust the first link.
+        {
+            rhs.links[0].articulation = articulation;
+            rhs.links[0].parent_shift = parent_shift;
+            rhs.links[0].body_shift = body_shift;
+
+            rhs.links[0].assembly_id = self.velocities.len();
+            rhs.links[0].impulse_id = self.impulses.len();
+            rhs.links[0].internal_id = self.links.len();
+            rhs.links[0].parent_internal_id = parent;
+        }
+
+        // Grow buffers and append data from rhs.
+        self.grow_buffers(
+            rhs_copy_ndofs + rhs.links[0].articulation.ndofs(),
+            rhs.impulses.len() + rhs.links[0].articulation.nimpulses(),
+            rhs.links.len(),
+        );
+
+        if rhs_copy_ndofs > 0 {
+            self.velocities
+                .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
+                .copy_from(&rhs.velocities.rows(SPATIAL_DIM, rhs_copy_ndofs));
+            self.damping
+                .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
+                .copy_from(&rhs.damping.rows(SPATIAL_DIM, rhs_copy_ndofs));
+            self.accelerations
+                .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
+                .copy_from(&rhs.accelerations.rows(SPATIAL_DIM, rhs_copy_ndofs));
+            self.impulses
+                .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
+                .copy_from(&rhs.impulses.rows(SPATIAL_DIM, rhs_copy_ndofs));
+        }
+
+        self.links.append(&mut rhs.links);
+        self.ndofs = self.velocities.len();
+        self.workspace.resize(self.links.len(), self.ndofs);
     }
 
     /// The first link of this multibody.
@@ -208,7 +294,7 @@ impl Multibody {
          */
         let ndofs = dof.ndofs();
         let nimpulses = dof.nimpulses();
-        self.grow_buffers(ndofs, nimpulses);
+        self.grow_buffers(ndofs, nimpulses, 1);
         self.ndofs += ndofs;
 
         /*
@@ -257,12 +343,13 @@ impl Multibody {
         &mut self.links[internal_id]
     }
 
-    fn grow_buffers(&mut self, ndofs: usize, nimpulses: usize) {
+    fn grow_buffers(&mut self, ndofs: usize, nimpulses: usize, num_jacobians: usize) {
         let len = self.velocities.len();
         self.velocities.resize_vertically_mut(len + ndofs, 0.0);
         self.damping.resize_vertically_mut(len + ndofs, 0.0);
         self.accelerations.resize_vertically_mut(len + ndofs, 0.0);
-        self.body_jacobians.push(Jacobian::zeros(0));
+        self.body_jacobians
+            .extend((0..num_jacobians).map(|_| Jacobian::zeros(0)));
 
         let len = self.impulses.len();
         self.impulses.resize_vertically_mut(len + nimpulses, 0.0);
@@ -744,16 +831,37 @@ impl Multibody {
     pub(crate) fn impulses(&self) -> &[Real] {
         self.impulses.as_slice()
     }
+     */
 
-
-    pub fn apply_displacement(&mut self, disp: &[Real]) {
+    pub fn apply_displacements(&mut self, disp: &[Real]) {
         for rb in self.links.iter_mut() {
             rb.articulation.apply_displacement(&disp[rb.assembly_id..])
         }
-
-        self.update_kinematics();
     }
-     */
+
+    pub fn update_root_type<Bodies>(&mut self, bodies: &mut Bodies)
+    where
+        Bodies: ComponentSet<RigidBodyType> + ComponentSet<RigidBodyPosition>,
+    {
+        let rb_type: Option<&RigidBodyType> = bodies.get(self.links[0].rigid_body.0);
+        if let Some(rb_type) = rb_type {
+            if rb_type.is_dynamic() != self.root_is_dynamic {
+                let pos: &RigidBodyPosition = bodies.index(self.links[0].rigid_body.0);
+
+                if rb_type.is_dynamic() {
+                    self.links[0].articulation = Box::new(FreeArticulation::new(pos.position));
+                    self.links[0].assembly_id = 0;
+                    self.ndofs += SPATIAL_DIM;
+                } else {
+                    self.links[0].articulation = Box::new(FixedArticulation::new(pos.position));
+                    self.links[0].assembly_id = SPATIAL_DIM;
+                    self.ndofs -= SPATIAL_DIM;
+                }
+
+                self.root_is_dynamic = rb_type.is_dynamic();
+            }
+        }
+    }
 
     pub fn forward_kinematics<Bodies>(&mut self, bodies: &mut Bodies)
     where
@@ -848,6 +956,45 @@ impl Multibody {
         *j_id += self.ndofs * 2;
 
         j.dot(&invm_j)
+    }
+
+    pub fn fill_jacobians_generic<const D: usize>(
+        &self,
+        link_id: usize,
+        unit_forces: &SMatrix<Real, SPATIAL_DIM, D>,
+        j_id: &mut usize,
+        jacobians: &mut DVector<Real>,
+    ) -> SMatrix<Real, D, D> {
+        let jacobians = jacobians.as_mut_slice();
+
+        let wj_id = *j_id + self.ndofs * D;
+        let link = &self.links[link_id];
+        let mut out_j = MatrixSliceMut::<Real, Dynamic, Const<D>>::from_slice(
+            &mut jacobians[..*j_id],
+            self.ndofs,
+        );
+        self.body_jacobians[link.internal_id].tr_mul_to(unit_forces, &mut out_j);
+
+        // TODO: Optimize with a copy_nonoverlapping?
+        for i in 0..self.ndofs {
+            jacobians[wj_id + i] = jacobians[*j_id + i];
+        }
+
+        {
+            let mut out_invm_j = MatrixSliceMut::<Real, Dynamic, Const<D>>::from_slice(
+                &mut jacobians[..wj_id],
+                self.ndofs,
+            );
+            assert!(self.inv_augmented_mass.solve_mut(&mut out_invm_j))
+        }
+
+        let j = MatrixSlice::<Real, Dynamic, Const<D>>::from_slice(&jacobians[..*j_id], self.ndofs);
+        let invm_j =
+            MatrixSlice::<Real, Dynamic, Const<D>>::from_slice(&jacobians[..wj_id], self.ndofs);
+
+        *j_id += self.ndofs * D * 2;
+
+        j.tr_mul(&invm_j)
     }
 
     /*

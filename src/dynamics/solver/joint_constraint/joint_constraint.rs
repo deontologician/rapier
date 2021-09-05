@@ -25,6 +25,8 @@ use crate::dynamics::{
 use crate::math::Real;
 #[cfg(feature = "simd-is-enabled")]
 use crate::math::SIMD_WIDTH;
+use crate::prelude::ArticulationSet;
+use na::DVector;
 
 pub(crate) enum AnyJointVelocityConstraint {
     BallConstraint(BallVelocityConstraint),
@@ -76,6 +78,9 @@ impl AnyJointVelocityConstraint {
         joint_id: JointIndex,
         joint: &Joint,
         bodies: &Bodies,
+        multibodies: &ArticulationSet,
+        j_id: &mut usize,
+        jacobians: &mut DVector<Real>,
     ) -> Self
     where
         Bodies: ComponentSet<RigidBodyPosition>
@@ -95,10 +100,19 @@ impl AnyJointVelocityConstraint {
             bodies.index(joint.body2.0),
             bodies.index(joint.body2.0),
         );
+        let mb1 = multibodies
+            .rigid_body_link(joint.body1)
+            .map(|link| (&multibodies[link.multibody], link.id));
+        let mb2 = multibodies
+            .rigid_body_link(joint.body2)
+            .map(|link| (&multibodies[link.multibody], link.id));
 
         match &joint.params {
             JointParams::BallJoint(p) => AnyJointVelocityConstraint::BallConstraint(
-                BallVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
+                // FIXME: multibodies.
+                BallVelocityConstraint::from_params(
+                    params, joint_id, rb1, rb2, mb1, mb2, j_id, jacobians, p,
+                ),
             ),
             JointParams::FixedJoint(p) => AnyJointVelocityConstraint::FixedConstraint(
                 FixedVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),

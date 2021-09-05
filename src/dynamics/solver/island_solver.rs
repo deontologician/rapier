@@ -1,6 +1,7 @@
 use super::{PositionSolver, VelocitySolver};
 use crate::counters::Counters;
 use crate::data::{BundleSet, ComponentSet, ComponentSetMut};
+use crate::dynamics::solver::generic_position_constraint::AnyGenericPositionConstraint;
 use crate::dynamics::solver::{
     AnyJointPositionConstraint, AnyJointVelocityConstraint, AnyPositionConstraint,
     AnyVelocityConstraint, GenericVelocityConstraint, SolverConstraints,
@@ -11,13 +12,17 @@ use crate::dynamics::{
 };
 use crate::dynamics::{IslandManager, RigidBodyVelocity};
 use crate::geometry::{ContactManifold, ContactManifoldIndex};
-use crate::prelude::MultibodySet;
+use crate::prelude::ArticulationSet;
 
 pub struct IslandSolver {
-    contact_constraints:
-        SolverConstraints<AnyVelocityConstraint, AnyPositionConstraint, GenericVelocityConstraint>,
+    contact_constraints: SolverConstraints<
+        AnyVelocityConstraint,
+        AnyPositionConstraint,
+        GenericVelocityConstraint,
+        AnyGenericPositionConstraint,
+    >,
     joint_constraints:
-        SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, ()>,
+        SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, (), ()>,
     velocity_solver: VelocitySolver,
     position_solver: PositionSolver,
 }
@@ -38,6 +43,8 @@ impl IslandSolver {
         }
     }
 
+    // NOTE: the position resolution MUST happen after the the velocity
+    //       resolution.
     pub fn solve_position_constraints<Bodies>(
         &mut self,
         island_id: usize,
@@ -45,8 +52,11 @@ impl IslandSolver {
         counters: &mut Counters,
         params: &IntegrationParameters,
         bodies: &mut Bodies,
+        multibodies: &mut ArticulationSet,
     ) where
-        Bodies: ComponentSet<RigidBodyIds> + ComponentSetMut<RigidBodyPosition>,
+        Bodies: ComponentSet<RigidBodyIds>
+            + ComponentSetMut<RigidBodyPosition>
+            + ComponentSetMut<RigidBodyMassProps>,
     {
         counters.solver.position_resolution_time.resume();
         self.position_solver.solve(
@@ -54,8 +64,16 @@ impl IslandSolver {
             params,
             islands,
             bodies,
+            multibodies,
             &self.contact_constraints.position_constraints,
+            &self.contact_constraints.generic_position_constraints,
             &self.joint_constraints.position_constraints,
+            // NOTE: the jacobian vector of velocity constraints is
+            //       large enough to serve as a workspace for the position solver.
+            //       It’s fine for us to mess up with this vector because we already
+            //       used these jacobians during the velocity iterations which must
+            //       happen before the position iterations.
+            &mut self.contact_constraints.generic_jacobians,
         );
         counters.solver.position_resolution_time.pause();
     }
@@ -71,7 +89,7 @@ impl IslandSolver {
         manifold_indices: &[ContactManifoldIndex],
         joints: &mut [JointGraphEdge],
         joint_indices: &[JointIndex],
-        multibodies: &mut MultibodySet,
+        multibodies: &mut ArticulationSet,
     ) where
         Bodies: ComponentSet<RigidBodyForces>
             + ComponentSetMut<RigidBodyPosition>
@@ -102,8 +120,15 @@ impl IslandSolver {
                 manifolds,
                 manifold_indices,
             );
-            self.joint_constraints
-                .init(island_id, params, islands, bodies, joints, joint_indices);
+            self.joint_constraints.init(
+                island_id,
+                params,
+                islands,
+                bodies,
+                multibodies,
+                joints,
+                joint_indices,
+            );
             counters.solver.velocity_assembly_time.pause();
 
             counters.solver.velocity_resolution_time.resume();
@@ -154,10 +179,12 @@ impl IslandSolver {
             }
 
             for handle in islands.active_island(island_id) {
-                if let Some((multibody, id)) = multibodies.rigid_body_link(*handle).copied() {
-                    if id == 0 {
+                if let Some(link) = multibodies.rigid_body_link(*handle).copied() {
+                    if link.id == 0 {
                         // This is the root of the multibody.
-                        let multibody = &mut multibodies.multibodies[multibody.0];
+                        let multibody = multibodies
+                            .get_multibody_mut_internal(link.multibody)
+                            .unwrap();
                         let accels = &multibody.accelerations;
                         multibody.velocities.axpy(params.dt, accels, 1.0);
                         multibody.integrate(params.dt);

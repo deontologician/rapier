@@ -2,9 +2,7 @@
 
 use na::{self, DVectorSliceMut, Unit};
 
-use crate::dynamics::{
-    Articulation, ArticulationMotor, IntegrationParameters, RigidBodyVelocity, UnitArticulation,
-};
+use crate::dynamics::{Articulation, ArticulationMotor, RigidBodyVelocity, UnitArticulation};
 use crate::math::{Isometry, JacobianSliceMut, Real, Rotation, Translation, Vector, DIM};
 
 /// A unit articulation that allows only one translational degree on freedom.
