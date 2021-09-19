@@ -131,20 +131,12 @@ fn create_revolute_articulations(
 
     let mut multibody = Multibody::new();
 
-    let ground = RigidBodyBuilder::new_dynamic() // new_static()
+    let ground = RigidBodyBuilder::new_static()
         .translation(vector![origin.x, origin.y, 0.0])
         .build();
     let mut curr_parent = bodies.insert(ground);
     let collider = ColliderBuilder::cuboid(rad, rad, rad).build();
     colliders.insert_with_parent(collider, curr_parent, bodies);
-
-    multibody.add_link(
-        None,
-        Box::new(FixedArticulation::new(Isometry::identity())),
-        vector![origin.x, origin.y, 0.0],
-        Vector::zeros(),
-        curr_parent,
-    );
 
     for i in 0..num {
         // Create four bodies.
@@ -452,7 +444,6 @@ pub fn init_world(testbed: &mut Testbed) {
     //     point![25.0, 5.0, 0.0],
     //     4,
     // );
-    /*
     create_revolute_articulations(
         &mut bodies,
         &mut colliders,
@@ -460,7 +451,6 @@ pub fn init_world(testbed: &mut Testbed) {
         point![20.0, 0.0, 0.0],
         3,
     );
-     */
     // create_fixed_joints(
     //     &mut bodies,
     //     &mut colliders,
@@ -482,7 +472,7 @@ pub fn init_world(testbed: &mut Testbed) {
     //     point![13.0, 10.0, 0.0],
     //     3,
     // );
-    create_ball_articulations(&mut bodies, &mut colliders, &mut articulations, 2); // 15);
+    create_ball_articulations(&mut bodies, &mut colliders, &mut articulations, 15);
 
     /*
      * Set up the testbed.

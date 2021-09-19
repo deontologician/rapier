@@ -8,7 +8,7 @@ use crate::math::{Isometry, JacobianSliceMut, Real, Vector, SPATIAL_DIM};
 /// This articulation can only be added between a `Ground` body (as parent) and any other body.
 #[derive(Copy, Clone, Debug)]
 pub struct FreeArticulation {
-    position: Isometry<Real>,
+    pub position: Isometry<Real>,
 }
 
 impl FreeArticulation {

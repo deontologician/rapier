@@ -136,19 +136,12 @@ impl Multibody {
         parent_shift: Vector<Real>,
         body_shift: Vector<Real>,
     ) {
-        let rhs_copy_shift = self.ndofs + SPATIAL_DIM;
-        let rhs_copy_ndofs = if rhs.ndofs == 0 {
-            0
-        } else {
-            // Note that if `rhs.ndofs` isn’t 0, then it must be
-            // at least equal to `SPATIAL_DIM` (because the root
-            // has a free articulation). So this subtraction won’t
-            // underflow.
-            rhs.ndofs - SPATIAL_DIM
-        };
+        let rhs_root_ndofs = rhs.links[0].articulation.ndofs();
+        let rhs_copy_shift = self.ndofs + rhs_root_ndofs;
+        let rhs_copy_ndofs = rhs.ndofs - rhs_root_ndofs;
 
         // Adjust the ids of all the rhs links except the first one.
-        let mut base_assembly_id = self.velocities.len() - SPATIAL_DIM + articulation.ndofs();
+        let mut base_assembly_id = self.velocities.len() - rhs_root_ndofs + articulation.ndofs();
         let mut base_impulse_id = self.impulses.len() + articulation.nimpulses();
         let mut base_internal_id = self.links.len() + 1;
         let mut base_parent_id = self.links.len();
@@ -182,16 +175,16 @@ impl Multibody {
         if rhs_copy_ndofs > 0 {
             self.velocities
                 .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
-                .copy_from(&rhs.velocities.rows(SPATIAL_DIM, rhs_copy_ndofs));
+                .copy_from(&rhs.velocities.rows(rhs_root_ndofs, rhs_copy_ndofs));
             self.damping
                 .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
-                .copy_from(&rhs.damping.rows(SPATIAL_DIM, rhs_copy_ndofs));
+                .copy_from(&rhs.damping.rows(rhs_root_ndofs, rhs_copy_ndofs));
             self.accelerations
                 .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
-                .copy_from(&rhs.accelerations.rows(SPATIAL_DIM, rhs_copy_ndofs));
+                .copy_from(&rhs.accelerations.rows(rhs_root_ndofs, rhs_copy_ndofs));
             self.impulses
                 .rows_mut(rhs_copy_shift, rhs_copy_ndofs)
-                .copy_from(&rhs.impulses.rows(SPATIAL_DIM, rhs_copy_ndofs));
+                .copy_from(&rhs.impulses.rows(rhs_root_ndofs, rhs_copy_ndofs));
         }
 
         self.links.append(&mut rhs.links);
@@ -845,20 +838,53 @@ impl Multibody {
     {
         let rb_type: Option<&RigidBodyType> = bodies.get(self.links[0].rigid_body.0);
         if let Some(rb_type) = rb_type {
-            if rb_type.is_dynamic() != self.root_is_dynamic {
-                let pos: &RigidBodyPosition = bodies.index(self.links[0].rigid_body.0);
+            let pos: &RigidBodyPosition = bodies.index(self.links[0].rigid_body.0);
 
+            if rb_type.is_dynamic() != self.root_is_dynamic {
                 if rb_type.is_dynamic() {
                     self.links[0].articulation = Box::new(FreeArticulation::new(pos.position));
                     self.links[0].assembly_id = 0;
                     self.ndofs += SPATIAL_DIM;
+
+                    self.velocities = self.velocities.clone().insert_rows(0, SPATIAL_DIM, 0.0);
+                    self.damping = self.damping.clone().insert_rows(0, SPATIAL_DIM, 0.0);
+                    self.accelerations =
+                        self.accelerations.clone().insert_rows(0, SPATIAL_DIM, 0.0);
+                    self.impulses = self.impulses.clone().insert_rows(0, SPATIAL_DIM, 0.0);
+
+                    for link in &mut (*self.links) {
+                        link.assembly_id += SPATIAL_DIM;
+                    }
                 } else {
-                    self.links[0].articulation = Box::new(FixedArticulation::new(pos.position));
+                    self.links[0].articulation =
+                        Box::new(FixedArticulation::new(pos.position.inverse()));
                     self.links[0].assembly_id = SPATIAL_DIM;
                     self.ndofs -= SPATIAL_DIM;
+
+                    self.velocities = self.velocities.index((SPATIAL_DIM.., 0)).into_owned();
+                    self.damping = self.damping.index((SPATIAL_DIM.., 0)).into_owned();
+                    self.accelerations = self.accelerations.index((SPATIAL_DIM.., 0)).into_owned();
+                    self.impulses = self.impulses.index((SPATIAL_DIM.., 0)).into_owned();
+
+                    for link in &mut (*self.links) {
+                        link.assembly_id -= SPATIAL_DIM;
+                    }
                 }
 
                 self.root_is_dynamic = rb_type.is_dynamic();
+            }
+
+            // Make sure the positions are properly set to match the rigid-body’s.
+            if let Some(articulation) = self.links[0]
+                .articulation
+                .downcast_mut::<FreeArticulation>()
+            {
+                articulation.position = pos.position;
+            } else if let Some(articulation) = self.links[0]
+                .articulation
+                .downcast_mut::<FixedArticulation>()
+            {
+                articulation.body_to_parent = pos.position;
             }
         }
     }
