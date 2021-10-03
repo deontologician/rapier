@@ -87,6 +87,7 @@ mod fixed_velocity_constraint_wide;
 // #[cfg(feature = "simd-is-enabled")]
 // mod generic_velocity_constraint_wide;
 mod ball_velocity_ground_constraint;
+mod generic_multibody_joint_constraint;
 mod joint_constraint;
 mod joint_position_constraint;
 mod prismatic_position_constraint;

@@ -1,5 +1,7 @@
+use crate::data::graph::NodeIndex;
 use crate::data::{Arena, Coarena};
 use crate::dynamics::{Articulation, Multibody, RigidBodyHandle};
+use crate::geometry::{InteractionGraph, RigidBodyGraphIndex, TemporaryInteractionIndex};
 use crate::math::{Real, Vector};
 use crate::parry::partitioning::IndexedData;
 use std::ops::Index;
@@ -53,6 +55,7 @@ impl IndexedData for ArticulationHandle {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ArticulationLink {
+    pub graph_id: RigidBodyGraphIndex,
     pub multibody: MultibodyIndex,
     pub id: usize,
 }
@@ -60,6 +63,7 @@ pub struct ArticulationLink {
 impl Default for ArticulationLink {
     fn default() -> Self {
         Self {
+            graph_id: RigidBodyGraphIndex::new(crate::INVALID_U32),
             multibody: MultibodyIndex(crate::data::arena::Index::from_raw_parts(
                 crate::INVALID_U32,
                 crate::INVALID_U32,
@@ -73,6 +77,9 @@ impl Default for ArticulationLink {
 pub struct ArticulationSet {
     pub(crate) multibodies: Arena<Multibody>, // NOTE: a Slab would be sufficient.
     pub(crate) rb2mb: Coarena<ArticulationLink>,
+    // NOTE: this is mostly for the island extraction. So perhaps we won’t need
+    //       that any more in the future when we improve our island builder.
+    pub(crate) connectivity_graph: InteractionGraph<RigidBodyHandle, ()>,
 }
 
 impl ArticulationSet {
@@ -81,9 +88,11 @@ impl ArticulationSet {
         Self {
             multibodies: Arena::new(),
             rb2mb: Coarena::new(),
+            connectivity_graph: InteractionGraph::new(),
         }
     }
 
+    /// Inserts a new articulation into this set.
     pub fn insert(
         &mut self,
         body1: RigidBodyHandle,
@@ -95,6 +104,7 @@ impl ArticulationSet {
         let link1 = self.rb2mb.get(body1.0).copied().unwrap_or_else(|| {
             let mb_handle = self.multibodies.insert(Multibody::with_root(body1));
             ArticulationLink {
+                graph_id: self.connectivity_graph.graph.add_node(body1),
                 multibody: MultibodyIndex(mb_handle),
                 id: 0,
             }
@@ -103,6 +113,7 @@ impl ArticulationSet {
         let link2 = self.rb2mb.get(body2.0).copied().unwrap_or_else(|| {
             let mb_handle = self.multibodies.insert(Multibody::with_root(body2));
             ArticulationLink {
+                graph_id: self.connectivity_graph.graph.add_node(body2),
                 multibody: MultibodyIndex(mb_handle),
                 id: 0,
             }
@@ -113,6 +124,9 @@ impl ArticulationSet {
             return None;
         }
 
+        self.connectivity_graph
+            .graph
+            .add_edge(link1.graph_id, link2.graph_id, ());
         self.rb2mb.insert(body1.0, link1);
         self.rb2mb.insert(body2.0, link2);
 
@@ -133,6 +147,11 @@ impl ArticulationSet {
             body_shift,
         );
 
+        println!(
+            "Articulation added, num multibodies: {}",
+            self.multibodies.len()
+        );
+
         // Because each rigid-body can only have one parent link,
         // we can use the second rigid-body’s handle as the articulation’s
         // handle.
@@ -146,10 +165,15 @@ impl ArticulationSet {
         self.rb2mb.get(rb.0)
     }
 
+    /// Gets a reference to a multibody, based on its temporary index.
     pub fn get_multibody(&self, index: MultibodyIndex) -> Option<&Multibody> {
         self.multibodies.get(index.0)
     }
 
+    /// Gets a mutable reference to a multibody, based on its temporary index.
+    ///
+    /// This method will bypass any modification-detection automatically done by the
+    /// `ArticulationSet`.
     pub fn get_multibody_mut_internal(&mut self, index: MultibodyIndex) -> Option<&mut Multibody> {
         self.multibodies.get_mut(index.0)
     }
@@ -169,6 +193,19 @@ impl ArticulationSet {
         let link = self.rb2mb.get(handle.0)?;
         let multibody = self.multibodies.get_mut(link.multibody.0)?;
         Some((multibody, link.id))
+    }
+
+    /// Iterate through the handles of all the rigid-bodies attached to this rigid-body
+    /// by an articulation.
+    pub fn attached_bodies<'a>(
+        &'a self,
+        body: RigidBodyHandle,
+    ) -> impl Iterator<Item = RigidBodyHandle> + 'a {
+        self.rb2mb
+            .get(body.0)
+            .into_iter()
+            .flat_map(move |id| self.connectivity_graph.interactions_with(id.graph_id))
+            .map(move |inter| crate::utils::select_other((inter.0, inter.1), body))
     }
 }
 

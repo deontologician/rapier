@@ -1,5 +1,7 @@
 use crate::dynamics::SpringModel;
-use crate::math::{Point, Real, Rotation, UnitVector, Vector};
+use crate::math::{AngVector, Point, Real, Rotation, UnitVector, Vector, DIM, SPATIAL_DIM};
+use crate::utils::WCrossMatrix;
+use na::{matrix, SMatrix};
 
 #[derive(Copy, Clone, PartialEq)]
 #[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
@@ -144,5 +146,33 @@ impl BallJoint {
         self.motor_target_pos = target_pos;
         self.motor_stiffness = stiffness;
         self.motor_damping = damping;
+    }
+
+    pub(crate) fn jacobian_matrix(
+        &self,
+        sign: Real,
+        ang_rel_anchor: &AngVector<Real>,
+    ) -> SMatrix<Real, SPATIAL_DIM, DIM> {
+        let cmat = (sign * ang_rel_anchor).gcross_matrix();
+
+        #[rustfmt::skip]
+        #[cfg(feature = "dim3")]
+        return matrix![
+            sign, 0.0, 0.0;
+            0.0, sign, 0.0;
+            0.0, 0.0, sign;
+            cmat.m11, cmat.m12, cmat.m13;
+            cmat.m21, cmat.m22, cmat.m23;
+            cmat.m31, cmat.m32, cmat.m33
+        ];
+
+        #[rustfmt::skip]
+        #[cfg(feature = "dim2")]
+        return matrix![
+            sign, 0.0;
+            0.0, sign;
+            cmat.m11, cmat.m12;
+            cmat.m21, cmat.m22;
+        ];
     }
 }

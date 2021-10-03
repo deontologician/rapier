@@ -70,7 +70,7 @@ impl JointSet {
         &self.joint_graph
     }
 
-    /// Iterates through all the joitns attached to the given rigid-body.
+    /// Iterates through all the joints attached to the given rigid-body.
     pub fn joints_with<'a>(
         &'a self,
         body: RigidBodyHandle,

@@ -166,6 +166,10 @@ pub mod math {
     #[cfg(feature = "dim2")]
     pub const SPATIAL_DIM: usize = 3;
 
+    /// The maximum number of rotational degrees of freedom of a rigid-body.
+    #[cfg(feature = "dim2")]
+    pub const ANG_DIM: usize = 1;
+
     /*
      * 3D
      */
@@ -190,6 +194,10 @@ pub mod math {
     /// The maximum number of possible rotations and translations of a rigid body.
     #[cfg(feature = "dim3")]
     pub const SPATIAL_DIM: usize = 6;
+
+    /// The maximum number of rotational degrees of freedom of a rigid-body.
+    #[cfg(feature = "dim3")]
+    pub const ANG_DIM: usize = 3;
 }
 
 /// Prelude containing the common types defined by Rapier.

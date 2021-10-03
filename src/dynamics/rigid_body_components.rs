@@ -5,11 +5,14 @@ use crate::geometry::{
     ColliderShape,
 };
 use crate::math::{
-    AngVector, AngularInertia, Isometry, Point, Real, Rotation, Translation, Vector,
+    AngVector, AngularInertia, Isometry, Point, Real, Rotation, Translation, Vector, ANG_DIM, DIM,
+    SPATIAL_DIM,
 };
 use crate::parry::partitioning::IndexedData;
 use crate::utils::{WAngularInertia, WCross, WDot};
+use na::{ComplexField, DVector, SMatrix, SMatrixSlice, SMatrixSliceMut};
 use num::Zero;
+use std::ops::MulAssign;
 
 /// The unique handle of a rigid body added to a `RigidBodySet`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -335,6 +338,59 @@ impl RigidBodyMassProps {
                 self.effective_world_inv_inertia_sqrt.m23 = 0.0;
             }
         }
+    }
+
+    pub fn fill_jacobians_generic<const D: usize>(
+        &self,
+        unit_forces: &SMatrix<Real, SPATIAL_DIM, D>,
+        j_id: &mut usize,
+        jacobians: &mut DVector<Real>,
+    ) -> SMatrix<Real, D, D> {
+        let jacobians = jacobians.as_mut_slice();
+
+        let wj_id = *j_id + SPATIAL_DIM * D;
+        let mut out_j =
+            SMatrixSliceMut::<Real, SPATIAL_DIM, D>::from_slice(&mut jacobians[*j_id..]);
+        out_j.copy_from(unit_forces);
+
+        {
+            let mut out_invm_j =
+                SMatrixSliceMut::<Real, SPATIAL_DIM, D>::from_slice(&mut jacobians[wj_id..]);
+            out_invm_j.copy_from(unit_forces);
+            out_invm_j
+                .fixed_rows_mut::<DIM>(0)
+                .mul_assign(self.effective_inv_mass);
+
+            #[cfg(feature = "dim3")]
+            {
+                let unit_torque = unit_forces.fixed_rows::<ANG_DIM>(DIM);
+                let inv_inertia = self
+                    .effective_world_inv_inertia_sqrt
+                    .squared()
+                    .into_matrix();
+                out_invm_j.fixed_rows_mut::<ANG_DIM>(DIM).gemm(
+                    1.0,
+                    &inv_inertia,
+                    &unit_torque,
+                    0.0,
+                );
+            }
+            #[cfg(feature = "dim2")]
+            {
+                out_invm_j.fixed_rows_mut::<ANG_DIM>(DIM) *= self
+                    .rb_mprops
+                    .effective_world_inv_inertia_sqrt
+                    .squared()
+                    .into_matrix();
+            }
+        }
+
+        let j = SMatrixSlice::<Real, SPATIAL_DIM, D>::from_slice(&jacobians[*j_id..]);
+        let invm_j = SMatrixSlice::<Real, SPATIAL_DIM, D>::from_slice(&jacobians[wj_id..]);
+
+        *j_id += SPATIAL_DIM * D * 2;
+
+        j.tr_mul(&invm_j)
     }
 }
 

@@ -6,9 +6,9 @@ use crate::dynamics::{
 use crate::geometry::{
     Collider, ColliderHandle, ColliderMassProps, ColliderParent, ColliderPosition, ColliderShape,
 };
-use crate::math::{AngVector, Isometry, Point, Real, Rotation, Vector};
-use crate::utils::{self, WCross};
-use na::ComplexField;
+use crate::math::{AngVector, Isometry, Point, Real, Rotation, Vector, ANG_DIM, DIM, SPATIAL_DIM};
+use crate::utils::{self, WAngularInertia, WCross};
+use na::{ComplexField, DVector, SMatrix, SMatrixSlice, SMatrixSliceMut};
 use num::Zero;
 
 #[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]

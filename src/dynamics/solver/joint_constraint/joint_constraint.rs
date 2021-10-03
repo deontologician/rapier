@@ -17,18 +17,20 @@ use super::{WRevoluteVelocityConstraint, WRevoluteVelocityGroundConstraint};
 //     GenericVelocityConstraint, GenericVelocityGroundConstraint,
 // };
 use crate::data::{BundleSet, ComponentSet};
-use crate::dynamics::solver::DeltaVel;
+use crate::dynamics::solver::joint_constraint::generic_multibody_joint_constraint::GenericMultibodyJointConstraint;
+use crate::dynamics::solver::{DeltaVel, GenericVelocityConstraint};
 use crate::dynamics::{
     IntegrationParameters, Joint, JointGraphEdge, JointIndex, JointParams, RigidBodyIds,
     RigidBodyMassProps, RigidBodyPosition, RigidBodyType, RigidBodyVelocity,
 };
-use crate::math::Real;
 #[cfg(feature = "simd-is-enabled")]
 use crate::math::SIMD_WIDTH;
+use crate::math::{Real, SPATIAL_DIM};
 use crate::prelude::ArticulationSet;
 use na::DVector;
 
 pub(crate) enum AnyJointVelocityConstraint {
+    GenericConstraint3Dof(GenericMultibodyJointConstraint<3>),
     BallConstraint(BallVelocityConstraint),
     BallGroundConstraint(BallVelocityGroundConstraint),
     #[cfg(feature = "simd-is-enabled")]
@@ -107,26 +109,52 @@ impl AnyJointVelocityConstraint {
             .rigid_body_link(joint.body2)
             .map(|link| (&multibodies[link.multibody], link.id));
 
-        match &joint.params {
-            JointParams::BallJoint(p) => AnyJointVelocityConstraint::BallConstraint(
-                // FIXME: multibodies.
-                BallVelocityConstraint::from_params(
-                    params, joint_id, rb1, rb2, mb1, mb2, j_id, jacobians, p,
+        if mb1.is_some() || mb2.is_some() {
+            let multibodies_ndof = mb1.map(|m| m.0.ndofs()).unwrap_or(SPATIAL_DIM)
+                + mb2.map(|m| m.0.ndofs()).unwrap_or(SPATIAL_DIM);
+            // For each solver contact we generate up to SPATIAL_DIM constraints, and each
+            // constraints appends the multibodies jacobian and weighted jacobians.
+            // Also note that for joints, the rigid-bodies will also add their jacobians
+            // to the generic DVector.
+            // TODO: is this count correct when we take both motors and limits into account?
+            let required_jacobian_len = *j_id + multibodies_ndof * 2 * SPATIAL_DIM;
+
+            if jacobians.nrows() < required_jacobian_len {
+                jacobians.resize_vertically_mut(required_jacobian_len, 0.0);
+            }
+
+            match &joint.params {
+                JointParams::BallJoint(p) => AnyJointVelocityConstraint::GenericConstraint3Dof(
+                    GenericMultibodyJointConstraint::ball_constraint(
+                        params, joint_id, rb1, rb2, mb1, mb2, j_id, jacobians, p,
+                    ),
                 ),
-            ),
-            JointParams::FixedJoint(p) => AnyJointVelocityConstraint::FixedConstraint(
-                FixedVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
-            ),
-            JointParams::PrismaticJoint(p) => AnyJointVelocityConstraint::PrismaticConstraint(
-                PrismaticVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
-            ),
-            // JointParams::GenericJoint(p) => AnyJointVelocityConstraint::GenericConstraint(
-            //     GenericVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
-            // ),
-            #[cfg(feature = "dim3")]
-            JointParams::RevoluteJoint(p) => AnyJointVelocityConstraint::RevoluteConstraint(
-                RevoluteVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
-            ),
+                JointParams::FixedJoint(p) => todo!(),
+                JointParams::PrismaticJoint(p) => todo!(),
+                #[cfg(feature = "dim3")]
+                JointParams::RevoluteJoint(p) => todo!(),
+            }
+        } else {
+            match &joint.params {
+                JointParams::BallJoint(p) => {
+                    AnyJointVelocityConstraint::BallConstraint(BallVelocityConstraint::from_params(
+                        params, joint_id, rb1, rb2, mb1, mb2, j_id, jacobians, p,
+                    ))
+                }
+                JointParams::FixedJoint(p) => AnyJointVelocityConstraint::FixedConstraint(
+                    FixedVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
+                ),
+                JointParams::PrismaticJoint(p) => AnyJointVelocityConstraint::PrismaticConstraint(
+                    PrismaticVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
+                ),
+                // JointParams::GenericJoint(p) => AnyJointVelocityConstraint::GenericConstraint(
+                //     GenericVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
+                // ),
+                #[cfg(feature = "dim3")]
+                JointParams::RevoluteJoint(p) => AnyJointVelocityConstraint::RevoluteConstraint(
+                    RevoluteVelocityConstraint::from_params(params, joint_id, rb1, rb2, p),
+                ),
+            }
         }
     }
 
@@ -325,8 +353,16 @@ impl AnyJointVelocityConstraint {
         }
     }
 
-    pub fn warmstart(&self, mj_lambdas: &mut [DeltaVel<Real>]) {
+    pub fn warmstart(
+        &self,
+        jacobians: &DVector<Real>,
+        mj_lambdas: &mut [DeltaVel<Real>],
+        generic_mj_lambdas: &mut DVector<Real>,
+    ) {
         match self {
+            AnyJointVelocityConstraint::GenericConstraint3Dof(c) => {
+                c.warmstart(jacobians, mj_lambdas, generic_mj_lambdas)
+            }
             AnyJointVelocityConstraint::BallConstraint(c) => c.warmstart(mj_lambdas),
             AnyJointVelocityConstraint::BallGroundConstraint(c) => c.warmstart(mj_lambdas),
             #[cfg(feature = "simd-is-enabled")]
@@ -365,8 +401,16 @@ impl AnyJointVelocityConstraint {
         }
     }
 
-    pub fn solve(&mut self, mj_lambdas: &mut [DeltaVel<Real>]) {
+    pub fn solve(
+        &mut self,
+        jacobians: &DVector<Real>,
+        mj_lambdas: &mut [DeltaVel<Real>],
+        generic_mj_lambdas: &mut DVector<Real>,
+    ) {
         match self {
+            AnyJointVelocityConstraint::GenericConstraint3Dof(c) => {
+                c.solve(jacobians, mj_lambdas, generic_mj_lambdas)
+            }
             AnyJointVelocityConstraint::BallConstraint(c) => c.solve(mj_lambdas),
             AnyJointVelocityConstraint::BallGroundConstraint(c) => c.solve(mj_lambdas),
             #[cfg(feature = "simd-is-enabled")]
@@ -407,6 +451,9 @@ impl AnyJointVelocityConstraint {
 
     pub fn writeback_impulses(&self, joints_all: &mut [JointGraphEdge]) {
         match self {
+            AnyJointVelocityConstraint::GenericConstraint3Dof(c) => {
+                c.writeback_impulses(joints_all)
+            }
             AnyJointVelocityConstraint::BallConstraint(c) => c.writeback_impulses(joints_all),
 
             AnyJointVelocityConstraint::BallGroundConstraint(c) => c.writeback_impulses(joints_all),

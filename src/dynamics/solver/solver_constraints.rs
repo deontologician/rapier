@@ -417,7 +417,7 @@ impl SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, (
         //     .nongrouped_interactions
         //     .append(&mut self.ground_interaction_groups.grouped_interactions);
 
-        self.compute_nongrouped_joint_ground_constraints(params, bodies, joints);
+        self.compute_nongrouped_joint_ground_constraints(params, bodies, multibodies, joints);
         #[cfg(feature = "simd-is-enabled")]
         {
             self.compute_grouped_joint_ground_constraints(params, bodies, joints);
@@ -433,6 +433,7 @@ impl SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, (
         &mut self,
         params: &IntegrationParameters,
         bodies: &Bodies,
+        multibodies: &ArticulationSet,
         joints_all: &[JointGraphEdge],
     ) where
         Bodies: ComponentSet<RigidBodyType>
@@ -446,7 +447,8 @@ impl SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, (
             let vel_constraint =
                 AnyJointVelocityConstraint::from_joint_ground(params, *joint_i, joint, bodies);
             self.velocity_constraints.push(vel_constraint);
-            let pos_constraint = AnyJointPositionConstraint::from_joint_ground(joint, bodies);
+            let pos_constraint =
+                AnyJointPositionConstraint::from_joint_ground(joint, bodies, multibodies);
             self.position_constraints.push(pos_constraint);
         }
     }
@@ -494,7 +496,6 @@ impl SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, (
             + ComponentSet<RigidBodyIds>,
     {
         let mut j_id = 0;
-
         for joint_i in &self.interaction_groups.nongrouped_interactions {
             let joint = &joints_all[*joint_i].weight;
             let vel_constraint = AnyJointVelocityConstraint::from_joint(
@@ -507,7 +508,7 @@ impl SolverConstraints<AnyJointVelocityConstraint, AnyJointPositionConstraint, (
                 &mut self.generic_jacobians,
             );
             self.velocity_constraints.push(vel_constraint);
-            let pos_constraint = AnyJointPositionConstraint::from_joint(joint, bodies);
+            let pos_constraint = AnyJointPositionConstraint::from_joint(joint, bodies, multibodies);
             self.position_constraints.push(pos_constraint);
         }
     }

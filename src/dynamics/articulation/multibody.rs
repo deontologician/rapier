@@ -74,7 +74,7 @@ pub struct Multibody {
     augmented_mass: DMatrix<Real>,
     inv_augmented_mass: LU<Real, Dynamic, Dynamic>,
     ndofs: usize,
-    root_is_dynamic: bool,
+    pub(crate) root_is_dynamic: bool,
     pub(crate) solver_id: usize,
 
     /*
@@ -996,27 +996,27 @@ impl Multibody {
         let wj_id = *j_id + self.ndofs * D;
         let link = &self.links[link_id];
         let mut out_j = MatrixSliceMut::<Real, Dynamic, Const<D>>::from_slice(
-            &mut jacobians[..*j_id],
+            &mut jacobians[*j_id..],
             self.ndofs,
         );
         self.body_jacobians[link.internal_id].tr_mul_to(unit_forces, &mut out_j);
 
         // TODO: Optimize with a copy_nonoverlapping?
-        for i in 0..self.ndofs {
+        for i in 0..self.ndofs * D {
             jacobians[wj_id + i] = jacobians[*j_id + i];
         }
 
         {
             let mut out_invm_j = MatrixSliceMut::<Real, Dynamic, Const<D>>::from_slice(
-                &mut jacobians[..wj_id],
+                &mut jacobians[wj_id..],
                 self.ndofs,
             );
             assert!(self.inv_augmented_mass.solve_mut(&mut out_invm_j))
         }
 
-        let j = MatrixSlice::<Real, Dynamic, Const<D>>::from_slice(&jacobians[..*j_id], self.ndofs);
+        let j = MatrixSlice::<Real, Dynamic, Const<D>>::from_slice(&jacobians[*j_id..], self.ndofs);
         let invm_j =
-            MatrixSlice::<Real, Dynamic, Const<D>>::from_slice(&jacobians[..wj_id], self.ndofs);
+            MatrixSlice::<Real, Dynamic, Const<D>>::from_slice(&jacobians[wj_id..], self.ndofs);
 
         *j_id += self.ndofs * D * 2;
 

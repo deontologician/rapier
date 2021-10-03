@@ -144,26 +144,37 @@ impl IslandSolver {
                 &mut self.contact_constraints.generic_velocity_constraints,
                 &self.contact_constraints.generic_jacobians,
                 &mut self.joint_constraints.velocity_constraints,
+                &self.joint_constraints.generic_jacobians,
             );
             counters.solver.velocity_resolution_time.pause();
 
             counters.solver.velocity_update_time.resume();
 
             for handle in islands.active_island(island_id) {
-                let (poss, vels, damping, mprops): (
-                    &RigidBodyPosition,
-                    &RigidBodyVelocity,
-                    &RigidBodyDamping,
-                    &RigidBodyMassProps,
-                ) = bodies.index_bundle(handle.0);
+                if let Some(link) = multibodies.rigid_body_link(*handle).copied() {
+                    let multibody = multibodies
+                        .get_multibody_mut_internal(link.multibody)
+                        .unwrap();
 
-                let mut new_poss = *poss;
-                let new_vels = vels.apply_damping(params.dt, damping);
-                new_poss.next_position =
-                    vels.integrate(params.dt, &poss.position, &mprops.local_mprops.local_com);
+                    if link.id == 0 || link.id == 1 && !multibody.root_is_dynamic {
+                        multibody.integrate(params.dt);
+                    }
+                } else {
+                    let (poss, vels, damping, mprops): (
+                        &RigidBodyPosition,
+                        &RigidBodyVelocity,
+                        &RigidBodyDamping,
+                        &RigidBodyMassProps,
+                    ) = bodies.index_bundle(handle.0);
 
-                bodies.set_internal(handle.0, new_vels);
-                bodies.set_internal(handle.0, new_poss);
+                    let mut new_poss = *poss;
+                    let new_vels = vels.apply_damping(params.dt, damping);
+                    new_poss.next_position =
+                        vels.integrate(params.dt, &poss.position, &mprops.local_mprops.local_com);
+
+                    bodies.set_internal(handle.0, new_vels);
+                    bodies.set_internal(handle.0, new_poss);
+                }
             }
 
             counters.solver.velocity_update_time.pause();
@@ -172,19 +183,13 @@ impl IslandSolver {
             self.joint_constraints.clear();
             counters.solver.velocity_update_time.resume();
 
-            for (_, multibody) in &mut multibodies.multibodies {
-                let accels = &multibody.accelerations;
-                multibody.velocities.axpy(params.dt, accels, 1.0);
-                multibody.integrate(params.dt);
-            }
-
             for handle in islands.active_island(island_id) {
                 if let Some(link) = multibodies.rigid_body_link(*handle).copied() {
-                    if link.id == 0 {
-                        // This is the root of the multibody.
-                        let multibody = multibodies
-                            .get_multibody_mut_internal(link.multibody)
-                            .unwrap();
+                    let multibody = multibodies
+                        .get_multibody_mut_internal(link.multibody)
+                        .unwrap();
+
+                    if link.id == 0 || link.id == 1 && !multibody.root_is_dynamic {
                         let accels = &multibody.accelerations;
                         multibody.velocities.axpy(params.dt, accels, 1.0);
                         multibody.integrate(params.dt);

@@ -15,8 +15,8 @@ use super::{
 };
 use crate::data::{BundleSet, ComponentSet};
 use crate::dynamics::{
-    IntegrationParameters, Joint, JointParams, RigidBodyIds, RigidBodyMassProps, RigidBodyPosition,
-    RigidBodyType,
+    ArticulationSet, IntegrationParameters, Joint, JointParams, RigidBodyIds, RigidBodyMassProps,
+    RigidBodyPosition, RigidBodyType,
 };
 #[cfg(feature = "simd-is-enabled")]
 use crate::math::SIMD_WIDTH;
@@ -60,12 +60,23 @@ pub(crate) enum AnyJointPositionConstraint {
 }
 
 impl AnyJointPositionConstraint {
-    pub fn from_joint<Bodies>(joint: &Joint, bodies: &Bodies) -> Self
+    pub fn from_joint<Bodies>(joint: &Joint, bodies: &Bodies, multibodies: &ArticulationSet) -> Self
     where
         Bodies: ComponentSet<RigidBodyMassProps> + ComponentSet<RigidBodyIds>,
     {
         let rb1 = bodies.index_bundle(joint.body1.0);
         let rb2 = bodies.index_bundle(joint.body2.0);
+
+        let mb1 = multibodies
+            .rigid_body_link(joint.body1)
+            .map(|link| (&multibodies[link.multibody], link.id));
+        let mb2 = multibodies
+            .rigid_body_link(joint.body2)
+            .map(|link| (&multibodies[link.multibody], link.id));
+
+        if mb1.is_some() || mb2.is_some() {
+            return AnyJointPositionConstraint::Empty;
+        }
 
         match &joint.params {
             JointParams::BallJoint(p) => AnyJointPositionConstraint::BallJoint(
@@ -136,7 +147,11 @@ impl AnyJointPositionConstraint {
         }
     }
 
-    pub fn from_joint_ground<Bodies>(joint: &Joint, bodies: &Bodies) -> Self
+    pub fn from_joint_ground<Bodies>(
+        joint: &Joint,
+        bodies: &Bodies,
+        multibodies: &ArticulationSet,
+    ) -> Self
     where
         Bodies: ComponentSet<RigidBodyType>
             + ComponentSet<RigidBodyPosition>
@@ -155,6 +170,17 @@ impl AnyJointPositionConstraint {
 
         let rb1 = bodies.index(handle1.0);
         let rb2 = (bodies.index(handle2.0), bodies.index(handle2.0));
+
+        let mb1 = multibodies
+            .rigid_body_link(joint.body1)
+            .map(|link| (&multibodies[link.multibody], link.id));
+        let mb2 = multibodies
+            .rigid_body_link(joint.body2)
+            .map(|link| (&multibodies[link.multibody], link.id));
+
+        if mb1.is_some() || mb2.is_some() {
+            return AnyJointPositionConstraint::Empty;
+        }
 
         match &joint.params {
             JointParams::BallJoint(p) => AnyJointPositionConstraint::BallGroundConstraint(

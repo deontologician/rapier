@@ -249,44 +249,57 @@ fn create_fixed_joints(
 fn create_ball_articulations(
     bodies: &mut RigidBodySet,
     colliders: &mut ColliderSet,
+    joints: &mut JointSet,
     articulations: &mut ArticulationSet,
     num: usize,
 ) {
     let rad = 0.4;
     let shift = 1.0;
 
-    let mut multibody = Multibody::new();
-    let mut parent_handle = RigidBodyHandle::invalid();
+    let mut body_handles = Vec::new();
 
-    for i in 0..num {
-        let fi = i as f32;
+    for k in 0..10 {
+        for i in 0..14 {
+            let fk = k as f32;
+            let fi = i as f32;
 
-        let status = if i == 0 {
-            RigidBodyType::Static
-        } else {
-            RigidBodyType::Dynamic
-        };
+            let status = if i == 0 {
+                // && (k % 4 == 0 || k == num - 1) {
+                RigidBodyType::Static
+            } else {
+                RigidBodyType::Dynamic
+            };
 
-        let rigid_body = RigidBodyBuilder::new(status)
-            .translation(vector![0.0, 0.0, fi * shift * 2.0])
-            .build();
-        let child_handle = bodies.insert(rigid_body);
+            let rigid_body = RigidBodyBuilder::new(status)
+                .translation(vector![fk * shift, 0.0, fi * shift * 2.0])
+                .build();
+            let child_handle = bodies.insert(rigid_body);
+            let collider = ColliderBuilder::capsule_z(rad * 1.25, rad).build();
+            colliders.insert_with_parent(collider, child_handle, bodies);
 
-        let collider = ColliderBuilder::capsule_z(rad * 1.25, rad).build();
-        colliders.insert_with_parent(collider, child_handle, bodies);
+            // Vertical articulation.
+            if i > 0 {
+                let parent_handle = *body_handles.last().unwrap();
+                let articulation = BallArticulation::new(Vector::zeros());
+                articulations.insert(
+                    parent_handle,
+                    child_handle,
+                    articulation,
+                    Vector::zeros(),
+                    vector![0.0, 0.0, -shift * 2.0],
+                );
+            }
 
-        if i > 0 {
-            let articulation = BallArticulation::new(Vector::zeros());
-            articulations.insert(
-                parent_handle,
-                child_handle,
-                articulation,
-                Vector::zeros(),
-                vector![0.0, 0.0, -shift * 2.0],
-            );
+            // Horizontal articulation.
+            if k > 0 && i > 0 {
+                // let parent_index = body_handles.len() - num;
+                // let parent_handle = body_handles[parent_index];
+                // let joint = BallJoint::new(Point::origin(), point![-shift, 0.0, 0.0]);
+                // joints.insert(parent_handle, child_handle, joint);
+            }
+
+            body_handles.push(child_handle);
         }
-
-        parent_handle = child_handle;
     }
 }
 
@@ -444,13 +457,13 @@ pub fn init_world(testbed: &mut Testbed) {
     //     point![25.0, 5.0, 0.0],
     //     4,
     // );
-    create_revolute_articulations(
-        &mut bodies,
-        &mut colliders,
-        &mut articulations,
-        point![20.0, 0.0, 0.0],
-        3,
-    );
+    // create_revolute_articulations(
+    //     &mut bodies,
+    //     &mut colliders,
+    //     &mut articulations,
+    //     point![20.0, 0.0, 0.0],
+    //     3,
+    // );
     // create_fixed_joints(
     //     &mut bodies,
     //     &mut colliders,
@@ -472,7 +485,13 @@ pub fn init_world(testbed: &mut Testbed) {
     //     point![13.0, 10.0, 0.0],
     //     3,
     // );
-    create_ball_articulations(&mut bodies, &mut colliders, &mut articulations, 15);
+    create_ball_articulations(
+        &mut bodies,
+        &mut colliders,
+        &mut joints,
+        &mut articulations,
+        15,
+    );
 
     /*
      * Set up the testbed.

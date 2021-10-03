@@ -37,6 +37,7 @@ impl VelocitySolver {
         generic_contact_constraints: &mut [GenericVelocityConstraint],
         generic_contact_jacobians: &DVector<Real>,
         joint_constraints: &mut [AnyJointVelocityConstraint],
+        generic_joint_jacobians: &DVector<Real>,
     ) where
         Bodies: ComponentSet<RigidBodyForces>
             + ComponentSet<RigidBodyIds>
@@ -74,7 +75,11 @@ impl VelocitySolver {
          * Warmstart constraints.
          */
         for constraint in &*joint_constraints {
-            constraint.warmstart(&mut self.mj_lambdas[..]);
+            constraint.warmstart(
+                generic_joint_jacobians,
+                &mut self.mj_lambdas[..],
+                &mut self.generic_mj_lambdas,
+            );
         }
 
         for constraint in &*contact_constraints {
@@ -94,7 +99,11 @@ impl VelocitySolver {
          */
         for _ in 0..params.max_velocity_iterations {
             for constraint in &mut *joint_constraints {
-                constraint.solve(&mut self.mj_lambdas[..]);
+                constraint.solve(
+                    generic_joint_jacobians,
+                    &mut self.mj_lambdas[..],
+                    &mut self.generic_mj_lambdas,
+                );
             }
 
             for constraint in &mut *contact_constraints {
@@ -112,25 +121,31 @@ impl VelocitySolver {
 
         // Update velocities.
         for handle in islands.active_island(island_id) {
-            let (ids, mprops): (&RigidBodyIds, &RigidBodyMassProps) = bodies.index_bundle(handle.0);
+            if let Some(link) = multibodies.rigid_body_link(*handle).copied() {
+                let multibody = multibodies
+                    .get_multibody_mut_internal(link.multibody)
+                    .unwrap();
 
-            let dvel = self.mj_lambdas[ids.active_set_offset];
-            let dangvel = mprops
-                .effective_world_inv_inertia_sqrt
-                .transform_vector(dvel.angular);
+                if link.id == 0 || link.id == 1 && !multibody.root_is_dynamic {
+                    let mj_lambdas = self
+                        .generic_mj_lambdas
+                        .rows(multibody.solver_id, multibody.ndofs());
+                    multibody.velocities += mj_lambdas;
+                }
+            } else {
+                let (ids, mprops): (&RigidBodyIds, &RigidBodyMassProps) =
+                    bodies.index_bundle(handle.0);
 
-            bodies.map_mut_internal(handle.0, |vels| {
-                vels.linvel += dvel.linear;
-                vels.angvel += dangvel;
-            });
-        }
+                let dvel = self.mj_lambdas[ids.active_set_offset];
+                let dangvel = mprops
+                    .effective_world_inv_inertia_sqrt
+                    .transform_vector(dvel.angular);
 
-        for (_, multibody) in multibodies.multibodies.iter_mut() {
-            let mj_lambdas = self
-                .generic_mj_lambdas
-                .rows(multibody.solver_id, multibody.ndofs());
-            multibody.velocities += mj_lambdas;
-            multibody.integrate(params.dt); // TODO: this shouldn't be done here.
+                bodies.map_mut_internal(handle.0, |vels| {
+                    vels.linvel += dvel.linear;
+                    vels.angvel += dangvel;
+                });
+            }
         }
 
         // Write impulses back into the manifold structures.

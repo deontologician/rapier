@@ -8,6 +8,7 @@ use crate::math::{Isometry, JacobianSliceMut, Real, Translation, Vector};
 /// A articulation that does not allow any relative degrees of freedom.
 #[derive(Copy, Clone, Debug)]
 pub struct FixedArticulation {
+    /// The position of the attached link, relative to its parent.
     pub body_to_parent: Isometry<Real>,
 }
 
